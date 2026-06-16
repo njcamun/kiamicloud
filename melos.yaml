@@ -1,0 +1,27 @@
+# KiamiCloud — Monorepo Melos
+name: kiamicloud
+repository: https://github.com/kiamicloud/kiamicloud
+
+packages:
+  - packages/**
+  - apps/**
+
+command:
+  bootstrap:
+    environment:
+      sdk: ">=3.5.0 <4.0.0"
+      flutter: ">=3.24.0"
+
+scripts:
+  analyze:
+    run: melos exec -- dart analyze .
+    description: Analisa todos os pacotes
+  test:
+    run: melos exec --fail-fast -- dart test
+    description: Executa testes
+  get:
+    run: melos exec -- flutter pub get
+    description: flutter pub get em todos os pacotes
+  sync-branding:
+    run: dart run tool/sync_branding.dart
+    description: Copia branding/assets para o pacote Flutter core

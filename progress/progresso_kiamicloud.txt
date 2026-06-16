@@ -1,0 +1,200 @@
+================================================================================
+KIAMICLOUD — MEMÓRIA CONTÍNUA DO PROJETO
+Última actualização: 2026-05-16 (Fase 14)
+================================================================================
+
+1. ESTADO ACTUAL DO PROJETO
+--------------------------------------------------------------------------------
+Fases 1–14 CONCLUÍDAS (MVP + beta pronto para testadores).
+Firebase + Workers + D1 + R2 + Flutter completo.
+
+2. FASE ACTUAL
+--------------------------------------------------------------------------------
+FASE 14 — Beta: CONCLUÍDA
+Próxima: FASE 15 — Escalabilidade futura
+
+3. FUNCIONALIDADES CONCLUÍDAS
+--------------------------------------------------------------------------------
+FASE 3:
+[✓] firebase_core + firebase_auth + google_sign_in
+[✓] KiamiFirebase.initialize com detecção de placeholder YOUR_*
+[✓] AuthRepository + FirebaseAuthRepository
+[✓] UnconfiguredAuthRepository (app não crasha sem flutterfire)
+[✓] Riverpod: authStateProvider, kiamiRouterProvider
+[✓] GoRouter redirect (protecção de rotas /home, /settings)
+[✓] AuthPage: login, registo, Google, validação formulário
+[✓] Recuperação de palavra-passe (diálogo)
+[✓] Mensagens de erro Firebase em português
+[✓] Splash → home se sessão activa
+[✓] Definições: dados do utilizador + signOut real
+[✓] firebase_options.dart placeholder em cada app
+[✓] docs/FIREBASE_SETUP.md
+[✓] Scripts sync corrigidos + Logo_barra.png suportado
+
+SYNC BRANDING (correcção):
+[✓] sync-branding-assets.ps1 (ASCII, $PSScriptRoot)
+[✓] sync-branding-assets.cmd (duplo-clique)
+[✓] tool/sync_branding.dart
+[✓] melos run sync-branding
+
+FASE 4:
+[✓] workers/ — Hono + Wrangler (porta 8787)
+[✓] wrangler.toml — FIREBASE_PROJECT_ID=kiamicloud
+[✓] CORS localhost + 127.0.0.1 (qualquer porta)
+[✓] Validação JWT Firebase (JWKS, sem service account)
+[✓] GET /health, GET /me
+[✓] docs/CLOUDFLARE_WORKERS.md, workers/README.md
+[✓] wrangler dev testado localmente
+
+FASE 5:
+[✓] database/migrations/0001_initial_schema.sql
+[✓] database/migrations/0002_seed_plans.sql (Free → Ultra)
+[✓] wrangler.toml binding DB + migrations_dir
+[✓] ensureUser no GET /me (plano free automatico)
+[✓] GET /plans (publico)
+[✓] GET /health com database: ok
+[✓] workers/src/config/plans.ts
+[✓] docs/D1_SETUP.md
+[✓] npm run db:migrate:local
+[✓] Copiar token API nas Definições (5 toques Versão)
+
+FASE 6:
+[✓] Binding FILES_BUCKET + wrangler r2 bucket name
+[✓] aws4fetch — URLs pre-assinadas PUT/GET
+[✓] Modo local: upload/download directo via Worker (sem .dev.vars R2)
+[✓] POST /files/upload/init, complete
+[✓] PUT /files/upload/direct/:id
+[✓] GET /files, GET /files/:id/download
+[✓] Quota + limite 50 MB
+[✓] docs/R2_SETUP.md, storage/README.md
+
+FASE 7:
+[✓] KiamiApiClient + modelos
+[✓] Dashboard: quota, lista, upload, download
+[✓] docs/FLUTTER_API.md
+
+FASE 8:
+[✓] Saudação com nome do utilizador
+[✓] Cartão de quota com percentagem e badge do plano
+[✓] Pesquisa de ficheiros
+[✓] Ícones por tipo de ficheiro + data relativa
+[✓] Overlay de progresso no upload
+
+FASE 9:
+[✓] API PATCH /files/:id (renomear)
+[✓] API DELETE /files/:id (apagar + R2 + quota)
+[✓] Menu renomear / apagar na app
+
+FASE 10:
+[✓] workers/src/lib/quota.ts — estados ok/warning/critical/full
+[✓] GET /me com objecto quota (canUpload, message, usagePercent)
+[✓] KiamiQuotaInfo + QuotaUi + QuotaBanner (Flutter)
+[✓] Dashboard: banner 80%/95%/cheio, barra colorida, upload bloqueado
+[✓] Pré-validação tamanho vs storageAvailableBytes
+[✓] Definições: cartão plano + quota
+[✓] docs/QUOTAS.md
+
+FASE 11:
+[✓] Rate limit D1 (IP + utilizador + upload)
+[✓] Cabecalhos de seguranca HTTP
+[✓] CORS API_ALLOWED_ORIGINS
+[✓] GET /me/audit + security_events
+[✓] docs/SEGURANCA.md actualizado
+
+FASE 12:
+[✓] payment_checkouts + webhook mock
+[✓] GET/POST /billing/* + simulate-pay (dev)
+[✓] Flutter: BillingPage, upgrade de planos
+[✓] docs/PAGAMENTOS.md
+
+FASE 13:
+[✓] ADMIN_UIDS + middleware requireAdmin
+[✓] GET /admin/stats, /users, PATCH /users/:uid
+[✓] /admin/security-events, /admin/checkouts
+[✓] Tabela admin_actions (auditoria)
+[✓] Flutter AdminPage + link em Definições
+[✓] docs/ADMIN.md
+
+FASE 14:
+[✓] KiamiEnvironment (dev/beta/production) + dart-define
+[✓] wrangler env beta + production
+[✓] GET /beta/info, POST /beta/feedback
+[✓] Admin GET /admin/feedback
+[✓] BetaBanner + diagnósticos + feedback na app
+[✓] scripts/smoke-test-api.ps1, run-flutter-beta.cmd
+[✓] docs/BETA.md, docs/DEPLOY.md
+[✓] Health API v0.5.0-beta
+
+4. FUNCIONALIDADES PENDENTES
+--------------------------------------------------------------------------------
+FASE 15: escalabilidade (DO, queues, CDN, iOS, etc.)
+
+5. ESTRUTURA CRIADA (adicional Fase 3)
+--------------------------------------------------------------------------------
+packages/kiamicloud_core/lib/src/
+├── firebase/kiami_firebase.dart
+├── bootstrap/kiami_bootstrap.dart
+├── features/auth/
+│   ├── domain/
+│   ├── data/
+│   ├── providers/auth_providers.dart
+│   └── presentation/auth_page.dart
+└── routing/kiami_router_refresh.dart
+
+apps/*/lib/firebase_options.dart (placeholder)
+tool/sync_branding.dart
+scripts/sync-branding-assets.cmd
+
+6. DECISÕES TÉCNICAS
+--------------------------------------------------------------------------------
+• Firebase APENAS Auth (sem Storage/Firestore) — conforme arquitectura oficial.
+• Riverpod + GoRouter refreshListenable: redirect reactivo sem boilerplate.
+• Placeholder firebase_options: desenvolvimento local sem projecto Firebase;
+  utilizador activa com flutterfire configure.
+• UnconfiguredAuthRepository: DX segura; banner na UI em vez de crash.
+• Logos: cópia explícita branding→core; KiamiLogo tenta logo.png,
+  Logo_barra.png, depois SVG.
+• Scripts sync em 3 formatos: problema do utilizador era parsing PS1
+  (vírgulas em strings e caracteres Unicode).
+
+7. PROBLEMAS ENCONTRADOS
+--------------------------------------------------------------------------------
+• sync-branding-assets.ps1 falhava: vírgulas em Write-Host e em-dash Unicode.
+• Utilizador tinha PNG em branding/assets mas não no pacote core.
+
+8. SOLUÇÕES APLICADAS
+--------------------------------------------------------------------------------
+• PS1 reescrito em ASCII; $PSScriptRoot para paths fiáveis.
+• .cmd chama PowerShell com ExecutionPolicy Bypass.
+• dart run tool/sync_branding.dart como alternativa.
+• KiamiLogo suporta Logo_barra.png para tema claro.
+
+9. PRÓXIMOS PASSOS (FASE 15+)
+--------------------------------------------------------------------------------
+1. Deploy beta remoto e convidar testadores
+2. Gateway de pagamento real
+3. Escalabilidade (Durable Objects, filas, iOS)
+
+10. ROADMAP ACTUALIZADO
+--------------------------------------------------------------------------------
+| Fase | Nome                    | Estado      |
+|------|-------------------------|-------------|
+| 1    | Fundação e Branding     | CONCLUÍDA   |
+| 2    | Arquitectura Flutter    | CONCLUÍDA   |
+| 3    | Firebase Authentication | CONCLUÍDA   |
+| 4    | Cloudflare Workers      | CONCLUÍDA   |
+| 5    | Cloudflare D1           | CONCLUÍDA   |
+| 6    | Cloudflare R2           | CONCLUÍDA   |
+| 7    | Upload/Download Flutter | CONCLUÍDA   |
+| 8    | Dashboard               | CONCLUÍDA   |
+| 9    | Gestão de ficheiros     | CONCLUÍDA   |
+| 10   | Sistema de quotas       | CONCLUÍDA   |
+| 11   | Segurança avançada      | CONCLUÍDA   |
+| 12   | Pagamentos (mock)       | CONCLUÍDA   |
+| 13   | Painel administrativo   | CONCLUÍDA   |
+| 14   | Beta                    | CONCLUÍDA   |
+| 15   | Escalabilidade          | PENDENTE    |
+
+================================================================================
+Fim do registo — Fase 14
+================================================================================

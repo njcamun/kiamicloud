@@ -1,0 +1,28 @@
+{
+  "name": "kiamicloud-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "dev:clean": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/restart-api-clean.ps1",
+    "deploy": "wrangler deploy",
+    "deploy:beta": "wrangler deploy --env beta",
+    "deploy:production": "wrangler deploy --env production",
+    "smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/smoke-test-api.ps1",
+    "typecheck": "tsc --noEmit",
+    "db:migrate:local": "wrangler d1 migrations apply kiamicloud-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply kiamicloud-db --remote",
+    "db:studio:local": "wrangler d1 execute kiamicloud-db --local --command \"SELECT code, name, quota_bytes FROM plans\"",
+    "blade-console:embed": "node scripts/embed-blade-console.mjs"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20",
+    "hono": "^4.7.4",
+    "jose": "^5.9.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250214.0",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.92.0"
+  }
+}

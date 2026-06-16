@@ -1,0 +1,12 @@
+{
+  "name": "kiamicloud-api-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GUI local para gerir a API KiamiCloud (wrangler dev)",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

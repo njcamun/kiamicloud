@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" fill="none" role="img" aria-label="KiamiCloud">
+  <!-- �cone cloud estilizado -->
+  <g transform="translate(0, 4)">
+    <path d="M20 28c-5.5 0-10-4.5-10-10 0-4.8 3.4-8.8 8-9.7C19.2 4.2 22.8 2 27 2c5.2 0 9.5 3.8 10.3 8.7 4.1.8 7.2 4.5 7.2 8.8 0 4.9-4 8.8-8.8 8.8H20z" fill="#1565FF"/>
+    <path d="M27 6c-3.3 0-6.1 2.2-7 5.2l-.5 1.6-1.7.2C14.5 13.8 12 16.7 12 20c0 4.4 3.6 8 8 8h12c3.3 0 6-2.7 6-6 0-2.8-1.9-5.1-4.5-5.8l-1.5-.4-.3-1.5C29.2 8.5 28.3 6 27 6z" fill="#00C2FF" opacity="0.85"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="52" y="32" font-family="Poppins, system-ui, sans-serif" font-size="22" font-weight="600" fill="#0D1B2A">
+    Kiami<tspan fill="#1565FF">Cloud</tspan>
+  </text>
+</svg>

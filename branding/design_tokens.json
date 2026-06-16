@@ -1,0 +1,83 @@
+{
+  "$schema": "https://kiamicloud.dev/schemas/design-tokens/v1",
+  "meta": {
+    "name": "KiamiCloud Design Tokens",
+    "version": "1.0.0",
+    "locale": "pt-PT"
+  },
+  "color": {
+    "deepBlue": "#0D1B2A",
+    "primaryBlue": "#1565FF",
+    "cloudBlue": "#00C2FF",
+    "softWhite": "#E6F2FF",
+    "lightGray": "#F2F4F7",
+    "semantic": {
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#00C2FF"
+    },
+    "dark": {
+      "background": "#0D1B2A",
+      "surface": "#1B2838",
+      "surfaceElevated": "#243447",
+      "textPrimary": "#E6F2FF",
+      "textSecondary": "#94A3B8"
+    },
+    "light": {
+      "background": "#F2F4F7",
+      "surface": "#FFFFFF",
+      "textPrimary": "#0D1B2A",
+      "textSecondary": "#64748B"
+    }
+  },
+  "typography": {
+    "fontFamily": {
+      "primary": "Poppins",
+      "mono": "JetBrains Mono"
+    },
+    "scale": {
+      "displayLarge": { "size": 32, "weight": 700, "lineHeight": 1.2 },
+      "displayMedium": { "size": 28, "weight": 600, "lineHeight": 1.25 },
+      "headlineLarge": { "size": 24, "weight": 600, "lineHeight": 1.3 },
+      "headlineMedium": { "size": 20, "weight": 600, "lineHeight": 1.35 },
+      "titleLarge": { "size": 18, "weight": 500, "lineHeight": 1.4 },
+      "bodyLarge": { "size": 16, "weight": 400, "lineHeight": 1.5 },
+      "bodyMedium": { "size": 14, "weight": 400, "lineHeight": 1.5 },
+      "labelLarge": { "size": 14, "weight": 500, "lineHeight": 1.4 },
+      "labelSmall": { "size": 12, "weight": 500, "lineHeight": 1.3 }
+    }
+  },
+  "spacing": {
+    "unit": 4,
+    "xs": 4,
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "xl": 32,
+    "xxl": 48
+  },
+  "radius": {
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "full": 9999
+  },
+  "elevation": {
+    "none": 0,
+    "sm": 2,
+    "md": 4,
+    "lg": 8
+  },
+  "motion": {
+    "durationFast": 150,
+    "durationNormal": 250,
+    "durationSlow": 400,
+    "curve": "easeInOutCubic"
+  },
+  "limits": {
+    "maxUploadBytes": 52428800,
+    "maxUploadLabel": "50 MB"
+  }
+}

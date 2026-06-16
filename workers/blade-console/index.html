@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KiamiCloud — Consola Blade</title>
+  <style>
+    :root {
+      --bg: #0f1724;
+      --card: #162536;
+      --border: #243447;
+      --text: #e8eef5;
+      --muted: #8fa3b8;
+      --accent: #3b82f6;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    header h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+    header p { margin: 4px 0 0; color: var(--muted); font-size: 0.85rem; }
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #1e3a5f;
+      color: #93c5fd;
+    }
+    main { padding: 20px 24px 40px; max-width: 1200px; margin: 0 auto; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .stat label { display: block; font-size: 0.75rem; color: var(--muted); }
+    .stat strong { font-size: 1.4rem; }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .panel h2 {
+      margin: 0;
+      padding: 12px 16px;
+      font-size: 0.95rem;
+      border-bottom: 1px solid var(--border);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; }
+    tr:last-child td { border-bottom: none; }
+    .muted { color: var(--muted); }
+    .login {
+      max-width: 380px;
+      margin: 80px auto;
+      padding: 24px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .login h1 { margin: 0 0 8px; font-size: 1.25rem; }
+    .login p { color: var(--muted); font-size: 0.9rem; margin: 0 0 20px; }
+    button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      width: 100%;
+    }
+    button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); margin-top: 8px; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error { color: #f87171; font-size: 0.85rem; margin-top: 10px; }
+    .login-field {
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    .login-field:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .toolbar button { width: auto; }
+    .live { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; margin-right: 6px; }
+    .user-block { border-bottom: 1px solid var(--border); }
+    .user-block:last-child { border-bottom: none; }
+    .user-head {
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: rgba(255,255,255,0.02);
+      cursor: pointer;
+      user-select: none;
+    }
+    .user-head:hover { background: rgba(255,255,255,0.04); }
+    .user-head strong { font-size: 0.95rem; }
+    .user-meta { font-size: 0.8rem; color: var(--muted); }
+    .cat {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #1e293b;
+      color: #94a3b8;
+      text-transform: capitalize;
+    }
+    .files-wrap { overflow-x: auto; }
+    .files-wrap[hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <div id="login-view" class="login">
+    <h1>Consola Blade</h1>
+    <p>Monitorização local (LAN). Dados do ZimaBlade apenas.</p>
+    <form id="login-form">
+      <input id="username-input" class="login-field" type="text" autocomplete="username" value="admin" placeholder="Utilizador" required />
+      <input id="password-input" class="login-field" type="password" autocomplete="current-password" placeholder="Password" required />
+      <button id="btn-login" type="submit">Entrar</button>
+    </form>
+    <div id="login-error" class="error"></div>
+  </div>
+
+  <div id="app-view" hidden>
+    <header>
+      <div>
+        <h1><span class="live"></span>KiamiCloud — ZimaBlade</h1>
+        <p id="admin-label" class="muted">Gestão local</p>
+      </div>
+      <div class="toolbar">
+        <span class="badge">API local · LAN</span>
+        <button id="btn-refresh" type="button">Actualizar</button>
+        <button id="btn-logout" class="secondary" type="button">Sair</button>
+      </div>
+    </header>
+    <main>
+      <div class="grid" id="stats"></div>
+      <div class="panel">
+        <h2>Ficheiros por utilizador</h2>
+        <div id="files-by-user"></div>
+      </div>
+      <div class="panel">
+        <h2>Utilizadores activos (últimos 30 min)</h2>
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Utilizador</th><th>UID</th><th>Ficheiros</th><th>Última actividade</th></tr></thead><tbody id="active-users"></tbody></table>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Actividade recente</h2>
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Hora</th><th>Utilizador</th><th>Acção</th><th>Ficheiro</th></tr></thead><tbody id="activity"></tbody></table>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Eventos de segurança</h2>
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Hora</th><th>Tipo</th><th>UID</th><th>Path</th></tr></thead><tbody id="security"></tbody></table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    let poll;
+
+    const $ = (id) => document.getElementById(id);
+    const loginView = $('login-view');
+    const appView = $('app-view');
+    const loginError = $('login-error');
+    const usernameInput = $('username-input');
+    const passwordInput = $('password-input');
+
+    async function api(path, options = {}) {
+      const res = await fetch(API + path, {
+        credentials: 'include',
+        ...options,
+        headers: {
+          Accept: 'application/json',
+          ...(options.headers || {}),
+        },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.message || 'Erro ' + res.status);
+      return body;
+    }
+
+    function showLogin() {
+      clearInterval(poll);
+      loginView.hidden = false;
+      appView.hidden = true;
+    }
+
+    function showApp(user) {
+      loginView.hidden = true;
+      appView.hidden = false;
+      loginError.textContent = '';
+      $('admin-label').textContent = user ? `Sessão: ${user}` : 'Gestão local';
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '—';
+      try { return new Date(iso + 'Z').toLocaleString('pt-PT'); } catch { return iso; }
+    }
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function fmtBytes(n) {
+      const b = Number(n) || 0;
+      if (b < 1024) return b + ' B';
+      if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+      if (b < 1024 * 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + ' MB';
+      return (b / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+    }
+
+    function userLabel(u) {
+      return u.displayName || u.email || u.uid;
+    }
+
+    async function loadDashboard() {
+      const [statsRes, filesRes, activeRes, feedRes, secRes] = await Promise.all([
+        api('/blade-console/api/stats'),
+        api('/blade-console/api/files-by-user?limitPerUser=200'),
+        api('/blade-console/api/activity/active-users?minutes=30'),
+        api('/blade-console/api/activity/feed?limit=60'),
+        api('/blade-console/api/security-events?limit=30'),
+      ]);
+
+      const s = statsRes.stats;
+      $('stats').innerHTML = [
+        ['Utilizadores', s.usersCount],
+        ['Ficheiros activos', s.activeFilesCount],
+        ['Armazenamento', Math.round(s.totalStorageUsedBytes / 1024 / 1024) + ' MB'],
+        ['Eventos 24h', s.securityEventsLast24h],
+      ].map(([label, val]) =>
+        `<div class="stat"><label>${esc(label)}</label><strong>${esc(val)}</strong></div>`
+      ).join('');
+
+      const filesRoot = $('files-by-user');
+      const groups = filesRes.users || [];
+      if (!groups.length) {
+        filesRoot.innerHTML = '<p class="muted" style="padding:16px">Sem ficheiros activos</p>';
+      } else {
+        filesRoot.innerHTML = groups.map((u, idx) => {
+          const label = esc(userLabel(u));
+          const shown = u.files.length;
+          const total = u.filesCount;
+          const trunc = shown < total ? ` (mostrando ${shown} de ${total})` : '';
+          const rows = u.files.map((f) =>
+            `<tr>
+              <td>${esc(f.name)}</td>
+              <td><span class="cat">${esc(f.category)}</span></td>
+              <td>${esc(f.mimeType || '—')}</td>
+              <td>${fmtBytes(f.sizeBytes)}</td>
+              <td class="muted">${fmtDate(f.createdAt)}</td>
+            </tr>`
+          ).join('');
+          return `<div class="user-block">
+            <div class="user-head" data-toggle="user-${idx}">
+              <div>
+                <strong>${label}</strong>
+                <div class="user-meta">${esc(u.uid).slice(0, 16)}… · ${total} ficheiro(s) · ${fmtBytes(u.totalSizeBytes)}${trunc}</div>
+              </div>
+              <span class="muted">▼</span>
+            </div>
+            <div class="files-wrap" id="user-${idx}">
+              <table>
+                <thead><tr><th>Nome</th><th>Tipo</th><th>MIME</th><th>Tamanho</th><th>Criado</th></tr></thead>
+                <tbody>${rows || '<tr><td colspan="5" class="muted">—</td></tr>'}</tbody>
+              </table>
+            </div>
+          </div>`;
+        }).join('');
+        filesRoot.querySelectorAll('.user-head').forEach((head) => {
+          head.addEventListener('click', () => {
+            const id = head.getAttribute('data-toggle');
+            const panel = document.getElementById(id);
+            if (panel) panel.hidden = !panel.hidden;
+          });
+        });
+      }
+
+      $('active-users').innerHTML = (activeRes.users || []).map((u) =>
+        `<tr><td>${esc(u.displayName || u.email || '—')}</td><td class="muted">${esc(u.uid).slice(0, 12)}…</td><td>${u.filesCount}</td><td>${fmtDate(u.lastSeenAt)}</td></tr>`
+      ).join('') || '<tr><td colspan="4" class="muted">Nenhum utilizador activo</td></tr>';
+
+      $('activity').innerHTML = (feedRes.feed || []).map((a) =>
+        `<tr><td>${fmtDate(a.createdAt)}</td><td>${esc(a.displayName || a.email || a.uid)}</td><td>${esc(a.action)}</td><td class="muted">${esc(a.fileId || '—')}</td></tr>`
+      ).join('') || '<tr><td colspan="4" class="muted">Sem actividade</td></tr>';
+
+      $('security').innerHTML = (secRes.events || []).map((e) =>
+        `<tr><td>${fmtDate(e.createdAt)}</td><td>${esc(e.eventType)}</td><td class="muted">${esc(e.firebaseUid || '—')}</td><td class="muted">${esc(e.path || '—')}</td></tr>`
+      ).join('') || '<tr><td colspan="4" class="muted">Sem eventos</td></tr>';
+    }
+
+    async function tryRestoreSession() {
+      try {
+        const session = await api('/blade-console/session');
+        showApp(session.user);
+        await loadDashboard();
+        poll = setInterval(() => loadDashboard().catch(handleAuthError), 15000);
+      } catch {
+        showLogin();
+      }
+    }
+
+    function handleAuthError(e) {
+      showLogin();
+      loginError.textContent = e.message || 'Sessao expirada. Entre novamente.';
+    }
+
+    $('login-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      loginError.textContent = '';
+      try {
+        const session = await api('/blade-console/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: usernameInput.value.trim(),
+            password: passwordInput.value,
+          }),
+        });
+        passwordInput.value = '';
+        showApp(session.user);
+        await loadDashboard();
+        poll = setInterval(() => loadDashboard().catch(handleAuthError), 15000);
+      } catch (e) {
+        loginError.textContent = e.message || 'Utilizador ou password incorrectos';
+      }
+    });
+
+    $('btn-logout').onclick = async () => {
+      try { await api('/blade-console/logout', { method: 'POST' }); } catch (_) { /* ignore */ }
+      showLogin();
+    };
+    $('btn-refresh').onclick = () => loadDashboard().catch((e) => {
+      loginError.textContent = e.message || String(e);
+    });
+
+    tryRestoreSession();
+  </script>
+</body>
+</html>

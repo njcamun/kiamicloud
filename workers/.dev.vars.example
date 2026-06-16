@@ -1,0 +1,18 @@
+# Copiar para .dev.vars (nao commitar)
+# FIREBASE_PROJECT_ID=kiamicloud
+
+# R2 API tokens (Cloudflare Dashboard → R2 → Manage R2 API Tokens)
+# Necessario para URLs pre-assinadas em producao.
+# Sem estes valores, wrangler dev usa upload/download directo via Worker (local).
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+
+# Fase 11 — CORS producao (virgula)
+# API_ALLOWED_ORIGINS=https://app.kiamicloud.com
+
+# Fase 12 — webhook mock de pagamento (obrigatorio para POST /billing/webhook)
+PAYMENT_WEBHOOK_SECRET=dev-kiami-webhook-change-me
+
+# Fase 13 — painel admin (seu firebase_uid)
+ADMIN_UIDS=COLOQUE_SEU_FIREBASE_UID_AQUI

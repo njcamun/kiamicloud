@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KiamiCloud — Consola API</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div>
+        <h1>KiamiCloud</h1>
+        <p class="tagline">Consola de desenvolvimento da API local</p>
+      </div>
+      <div class="status-pill" id="globalStatus">A verificar…</div>
+    </header>
+
+    <main class="grid">
+      <section class="card card-wide">
+        <h2>Estado da API</h2>
+        <div class="row">
+          <label>
+            IP LAN (telemóvel / rede)
+            <select id="apiHostSelect"></select>
+          </label>
+          <label>
+            Ou manual
+            <input type="text" id="apiHost" value="127.0.0.1" />
+          </label>
+          <button type="button" class="btn secondary" id="btnRefresh">Actualizar estado</button>
+        </div>
+        <div class="metrics" id="metrics"></div>
+        <pre class="log" id="statusLog">—</pre>
+      </section>
+
+      <section class="card">
+        <h2>Controlos</h2>
+        <p class="hint">Duplo-clique na raiz do projecto: <strong>Iniciar-API-GUI.bat</strong> · API simples: <strong>Iniciar-API-Local.bat</strong></p>
+        <div class="btn-stack">
+          <button type="button" class="btn primary" id="btnRestart">Reinício limpo + iniciar</button>
+          <button type="button" class="btn" id="btnStart">Iniciar API</button>
+          <button type="button" class="btn danger" id="btnStop">Parar API</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Testes rápidos</h2>
+        <div class="btn-stack">
+          <button type="button" class="btn" id="btnTestPing">Testar /health/ping</button>
+          <button type="button" class="btn" id="btnTestHealth">Testar /health completo</button>
+          <button type="button" class="btn secondary" id="btnOpenPing">Abrir no browser (PC)</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Rede &amp; telemóvel</h2>
+        <div class="btn-stack">
+          <button type="button" class="btn" id="btnFirewall">Abrir firewall (Admin)</button>
+          <button type="button" class="btn" id="btnAdb">adb reverse (USB)</button>
+          <button type="button" class="btn secondary" id="btnMigrate">Aplicar migracoes D1</button>
+          <button type="button" class="btn secondary" id="btnResetD1">Reset D1 local</button>
+        </div>
+        <ul class="ip-list" id="ipList"></ul>
+      </section>
+
+      <section class="card card-wide">
+        <h2>URLs úteis</h2>
+        <div class="urls" id="urlList"></div>
+      </section>
+
+      <section class="card card-wide">
+        <h2>Registo</h2>
+        <pre class="log" id="actionLog"></pre>
+      </section>
+    </main>
+
+    <footer>
+      <p>API <code>8787</code> · Consola <code>3847</code> · <code>docs/REDE_API_LOCAL.md</code></p>
+    </footer>
+    <script src="app.js"></script>
+  </body>
+</html>

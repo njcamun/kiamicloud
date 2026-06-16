@@ -1,0 +1,95 @@
+# KiamiCloud API — Cloudflare Workers
+name = "kiamicloud-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Firebase Project ID (nao e segredo — aud/iss do JWT)
+[vars]
+FIREBASE_PROJECT_ID = "kiamicloud"
+ENVIRONMENT = "development"
+R2_BUCKET_NAME = "kiamicloud-files-prod"
+R2_PRESIGN_EXPIRES_SECONDS = "900"
+PAYMENTS_ENABLED = "true"
+# Coloque o seu Firebase UID (Definicoes → copiar token / Firebase console)
+ADMIN_UIDS = "OR8Of13d7mZSXok1xzwgZ9r6RAC2,TMEMjDUmZjhr39BjYkbsGeSKFpN2"
+# Consola Blade (LAN) — credenciais locais
+BLADE_CONSOLE_USER = "admin"
+BLADE_CONSOLE_PASSWORD = "admin"
+# Definir em producao: wrangler secret put PAYMENT_WEBHOOK_SECRET
+# PAYMENT_WEBHOOK_SECRET = "dev-only-change-me"
+# API_ALLOWED_ORIGINS = "https://app.kiamicloud.com"
+
+[dev]
+port = 8787
+# 0.0.0.0 — telemovel na Wi-Fi acede via http://192.168.100.170:8787 (ZimaBlade)
+ip = "0.0.0.0"
+
+# D1 — metadados (migracoes em ../database/migrations)
+[[d1_databases]]
+binding = "DB"
+database_name = "kiamicloud-db"
+# Substituir apos: npx wrangler d1 create kiamicloud-db
+database_id = "1bdb62ef-9390-41bb-93f2-5c4d095bea92"
+migrations_dir = "../database/migrations"
+
+# R2 — ficheiros privados (Fase 6)
+[[r2_buckets]]
+binding = "FILES_BUCKET"
+bucket_name = "kiamicloud-files-prod"
+
+# Purge automático da lixeira (ficheiros com >30 dias em soft delete)
+[triggers]
+crons = ["0 4 * * *"]
+
+# --- Ambiente beta (deploy: wrangler deploy --env beta) ---
+[env.beta]
+name = "kiamicloud-api-beta"
+workers_dev = true
+
+[env.beta.vars]
+ENVIRONMENT = "beta"
+FIREBASE_PROJECT_ID = "kiamicloud"
+PAYMENTS_ENABLED = "true"
+API_VERSION = "0.5.0-beta"
+ADMIN_UIDS = "OR8Of13d7mZSXok1xzwgZ9r6RAC2,TMEMjDUmZjhr39BjYkbsGeSKFpN2"
+R2_BUCKET_NAME = "kiamicloud-files-beta"
+R2_PRESIGN_EXPIRES_SECONDS = "900"
+
+[[env.beta.d1_databases]]
+binding = "DB"
+database_name = "kiamicloud-db"
+database_id = "1bdb62ef-9390-41bb-93f2-5c4d095bea92"
+migrations_dir = "../database/migrations"
+
+[[env.beta.r2_buckets]]
+binding = "FILES_BUCKET"
+bucket_name = "kiamicloud-files-beta"
+
+[env.beta.triggers]
+crons = ["0 4 * * *"]
+
+# --- Producao (deploy: wrangler deploy --env production) ---
+[env.production]
+name = "kiamicloud-api"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+FIREBASE_PROJECT_ID = "kiamicloud"
+PAYMENTS_ENABLED = "true"
+API_VERSION = "0.5.0"
+ADMIN_UIDS = "OR8Of13d7mZSXok1xzwgZ9r6RAC2,TMEMjDUmZjhr39BjYkbsGeSKFpN2"
+R2_BUCKET_NAME = "kiamicloud-files-prod"
+R2_PRESIGN_EXPIRES_SECONDS = "900"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "kiamicloud-db"
+database_id = "1bdb62ef-9390-41bb-93f2-5c4d095bea92"
+migrations_dir = "../database/migrations"
+
+[[env.production.r2_buckets]]
+binding = "FILES_BUCKET"
+bucket_name = "kiamicloud-files-prod"
+
+[env.production.triggers]
+crons = ["0 4 * * *"]

@@ -1,0 +1,60 @@
+# =============================================================================
+# KiamiCloud — .gitignore global
+# Nunca versionar credenciais, chaves ou artefactos de build.
+# =============================================================================
+
+# --- Segredos e ambiente ---
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.jks
+**/secrets/
+**/credentials/
+# Firebase and Google Auth secrets
+google-services.json
+GoogleService-Info.plist
+firebase_app_id_file.json
+client_secret_*.json
+*.apps.googleusercontent.com.json
+.wrangler/
+.dev.vars
+
+# --- Flutter / Dart ---
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+**/build/
+*.iml
+.idea/
+.vscode/settings.json
+*.lock
+!pubspec.lock
+
+# --- Node / Workers ---
+node_modules/
+dist/
+.wrangler/
+worker-configuration.d.ts
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Logs e temporários ---
+*.log
+*.tmp
+*.temp
+.cache/
+
+# --- Coverage e testes ---
+coverage/
+.nyc_output/

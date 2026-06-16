@@ -1,0 +1,85 @@
+name: kiamicloud-blade-console
+services:
+  kiamicloud-api:
+    container_name: kiamicloud-api
+    image: node:22-bookworm
+    restart: unless-stopped
+    networks:
+      - kiamicloud-blade-net
+    ports:
+      - "8787:8787"
+    volumes:
+      - /home/casaos/kiamicloud:/app
+      - /DATA/AppData/$AppID/api-entrypoint.sh:/entrypoint.sh:ro
+    working_dir: /app/workers
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    # Sem healthcheck — CasaOS marca "offline" se o check falhar durante npm install.
+    x-casaos:
+      ports:
+        - container: "8787"
+          description:
+            en_us: KiamiCloud API (LAN)
+            pt_pt: API KiamiCloud (LAN)
+      volumes:
+        - container: /app
+          description:
+            en_us: Project files (/home/casaos/kiamicloud)
+            pt_pt: Ficheiros do projecto (/home/casaos/kiamicloud)
+
+  kiamicloud-blade-console:
+    container_name: kiamicloud-blade-console
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - kiamicloud-api
+    networks:
+      - kiamicloud-blade-net
+    ports:
+      - "8790:80"
+    volumes:
+      - /DATA/AppData/$AppID/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    x-casaos:
+      ports:
+        - container: "80"
+          description:
+            en_us: Blade console (proxy to API :8787)
+            pt_pt: Consola Blade (proxy para API :8787)
+      volumes:
+        - container: /etc/nginx/conf.d/default.conf
+          description:
+            en_us: Nginx config
+            pt_pt: Configuracao Nginx
+
+networks:
+  kiamicloud-blade-net:
+    name: kiamicloud-blade-net
+    driver: bridge
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: kiamicloud-blade-console
+  author: KiamiCloud
+  category: Utilities
+  scheme: http
+  description:
+    en_us: |
+      KiamiCloud local server — API (8787) and admin console (8790).
+      First start may take 1-3 minutes (npm install). Open again if status was offline.
+      Console login: admin / admin.
+    pt_pt: |
+      Servidor KiamiCloud local — API (8787) e consola admin (8790).
+      O primeiro arranque pode demorar 1-3 min (npm install). Reabra se aparecer offline.
+      Login consola: admin / admin.
+  developer: KiamiCloud
+  icon: icon.png
+  tagline:
+    en_us: Local API + admin console
+    pt_pt: API local + consola admin
+  thumbnail: icon.png
+  title:
+    en_us: KiamiCloud
+    pt_pt: KiamiCloud
+  index: /blade-console/
+  port_map: "8790"
