@@ -119,6 +119,9 @@ String kiamiApiErrorMessage(Object error) {
           : (error.message.isNotEmpty
               ? error.message
               : 'Ficheiro demasiado grande para o teu plano.'),
+      'subscription_restricted' => KiamiStrings.subscriptionRestricted,
+      'subscription_suspended' => KiamiStrings.subscriptionSuspended,
+      'storage_over_quota' => KiamiStrings.subscriptionStorageOverQuota,
       'invalid_token' || 'unauthorized' =>
         'Sessão inválida. Inicie sessão novamente.',
       'duplicate_name' => 'Já existe um ficheiro com este nome.',

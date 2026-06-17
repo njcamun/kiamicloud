@@ -25,9 +25,21 @@ Future<void> handleFilesForUpload({
   void Function(String message)? showMessage,
 }) async {
   final profile = ref.read(kiamiProfileProvider).valueOrNull;
-  if (KiamiApiLimits.enforced && profile != null && !profile.quota.canUpload) {
-    await onQuotaBlocked(profile);
-    return;
+  if (KiamiApiLimits.enforced && profile != null) {
+    final access = profile.access;
+    if (access != null && !access.canUpload) {
+      showMessage?.call(
+        KiamiStrings.subscriptionMessageFor(
+          effectiveStatus: access.effectiveStatus,
+          blockReason: access.blockReason,
+        ),
+      );
+      return;
+    }
+    if (!profile.quota.canUpload) {
+      await onQuotaBlocked(profile);
+      return;
+    }
   }
 
   final maxFileLimit = KiamiApiLimits.maxUploadFileBytes(

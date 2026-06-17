@@ -23,7 +23,9 @@ import '../../widgets/kiami_card.dart';
 import '../../widgets/kiami_page_header.dart';
 import '../../widgets/kiami_upload_zone.dart';
 import '../../widgets/quota_banner.dart';
+import '../../widgets/subscription_banner.dart';
 import '../../widgets/quota_limit_dialog.dart';
+import '../activity/account_notifications_popup.dart';
 import '../../utils/kiami_support_contact.dart';
 import '../../utils/kiami_layout.dart';
 import '../../utils/kiami_platform.dart';
@@ -149,6 +151,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                       error: (_, __) => KiamiStrings.dashboardTitle,
                     ),
           actions: [
+            const AccountNotificationsIconButton(),
             IconButton(
               visualDensity: VisualDensity.compact,
               tooltip: KiamiStrings.storageSupportTooltip,
@@ -368,7 +371,12 @@ class _DashboardTopSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (KiamiApiLimits.enforced)
+          if (KiamiApiLimits.enforced) ...[
+            if (profile.access != null)
+              SubscriptionBanner(
+                access: profile.access!,
+                onRenew: () => context.push(KiamiRoutes.billing),
+              ),
             QuotaBanner(
               quota: profile.quota,
               storageUsedBytes: profile.storageUsedBytes,
@@ -376,6 +384,7 @@ class _DashboardTopSection extends StatelessWidget {
               storageAvailableBytes: profile.storageAvailableBytes,
               onUpgrade: () => context.push(KiamiRoutes.billing),
             ),
+          ],
           if (!fixedStorageCard) ...[
             _StorageCard(
               profile: profile,
@@ -474,24 +483,34 @@ class _StorageCard extends StatelessWidget {
             if (!unlimited)
               ClipRRect(
                 borderRadius: BorderRadius.circular(KiamiDecorations.radiusSm),
-                child: TweenAnimationBuilder<double>(
-                  key: ValueKey('${profile.plan.code}-$quotaBytes'),
-                  duration: const Duration(milliseconds: 550),
-                  curve: Curves.easeOutCubic,
-                  tween: Tween<double>(begin: 0, end: ratio),
-                  builder: (context, value, _) {
-                    final isDark =
-                        Theme.of(context).brightness == Brightness.dark;
-                    return LinearProgressIndicator(
-                      value: value > 0 ? value : null,
-                      minHeight: expanded ? 12 : 10,
-                      backgroundColor: isDark
-                          ? KiamiColors.cloudBlue.withValues(alpha: 0.12)
-                          : KiamiColors.lightGray,
-                      color: barColor,
-                    );
-                  },
-                ),
+                child: ratio == 0
+                    ? LinearProgressIndicator(
+                        value: 0,
+                        minHeight: expanded ? 12 : 10,
+                        backgroundColor: Theme.of(context).brightness ==
+                                Brightness.dark
+                            ? KiamiColors.cloudBlue.withValues(alpha: 0.12)
+                            : KiamiColors.lightGray,
+                        color: barColor,
+                      )
+                    : TweenAnimationBuilder<double>(
+                        key: ValueKey('${profile.plan.code}-$quotaBytes-$used'),
+                        duration: const Duration(milliseconds: 550),
+                        curve: Curves.easeOutCubic,
+                        tween: Tween<double>(begin: 0, end: ratio),
+                        builder: (context, value, _) {
+                          final isDark =
+                              Theme.of(context).brightness == Brightness.dark;
+                          return LinearProgressIndicator(
+                            value: value,
+                            minHeight: expanded ? 12 : 10,
+                            backgroundColor: isDark
+                                ? KiamiColors.cloudBlue.withValues(alpha: 0.12)
+                                : KiamiColors.lightGray,
+                            color: barColor,
+                          );
+                        },
+                      ),
               ),
             if (!unlimited) const SizedBox(height: 10),
             Row(

@@ -18,6 +18,7 @@ abstract final class KiamiRoutes {
   static const String shares = '/shares';
   static const String admin = '/admin';
   static const String adminCheckouts = '/admin/checkouts';
+  static const String adminSubscriptions = '/admin/subscriptions';
   static const String adminUser = '/admin/users/:uid';
 
   static String adminUserFor(String uid) => '/admin/users/$uid';

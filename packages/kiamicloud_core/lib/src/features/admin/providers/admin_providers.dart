@@ -38,6 +38,40 @@ final adminCheckoutsProvider =
   },
 );
 
+class AdminSubscriptionsQuery {
+  const AdminSubscriptionsQuery({
+    this.status,
+    this.limit = 25,
+    this.offset = 0,
+  });
+
+  final String? status;
+  final int limit;
+  final int offset;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AdminSubscriptionsQuery &&
+      other.status == status &&
+      other.limit == limit &&
+      other.offset == offset;
+
+  @override
+  int get hashCode => Object.hash(status, limit, offset);
+}
+
+final adminSubscriptionsProvider = FutureProvider.autoDispose
+    .family<KiamiAdminSubscriptionList, AdminSubscriptionsQuery>(
+  (ref, query) async {
+    final api = ref.watch(kiamiApiClientProvider);
+    return api.listAdminSubscriptions(
+      status: query.status,
+      limit: query.limit,
+      offset: query.offset,
+    );
+  },
+);
+
 final adminDashboardProvider =
     FutureProvider.autoDispose<KiamiAdminDashboard>((ref) async {
   final api = ref.watch(kiamiApiClientProvider);

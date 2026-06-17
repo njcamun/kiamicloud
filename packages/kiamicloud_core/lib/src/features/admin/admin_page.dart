@@ -75,6 +75,15 @@ class _AdminPageState extends ConsumerState<AdminPage> {
             ),
             const SizedBox(height: 8),
             const AdminCloudflareUsageSection(),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => context.push(KiamiRoutes.adminSubscriptions),
+                icon: const Icon(Icons.subscriptions_outlined, size: 18),
+                label: const Text(KiamiStrings.adminViewSubscriptions),
+              ),
+            ),
             const SizedBox(height: 24),
             TextField(
               controller: _searchController,

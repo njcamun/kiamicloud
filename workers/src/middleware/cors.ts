@@ -23,7 +23,19 @@ function isLocalDevOrigin(origin: string): boolean {
   );
 }
 
-/** CORS: localhost em dev; API_ALLOWED_ORIGINS em producao (Fase 11). */
+/** Firebase Hosting / preview channels do projecto kiamicloud. */
+function isKiamiWebOrigin(origin: string): boolean {
+  try {
+    const host = new URL(origin).hostname.toLowerCase();
+    if (host === 'kiamicloud.firebaseapp.com') return true;
+    if (host === 'kiamicloud.web.app') return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+/** CORS: localhost em dev; Firebase Hosting em beta/prod; API_ALLOWED_ORIGINS extra. */
 export const kiamiCors = () =>
   cors({
     origin: (origin, c) => {
@@ -32,10 +44,15 @@ export const kiamiCors = () =>
       const allowed = parseAllowedOrigins(c.env.API_ALLOWED_ORIGINS);
       if (allowed.includes(origin)) return origin;
 
+      const env = c.env.ENVIRONMENT ?? 'development';
       if (
-        c.env.ENVIRONMENT !== 'production' &&
-        isLocalDevOrigin(origin)
+        (env === 'beta' || env === 'production') &&
+        isKiamiWebOrigin(origin)
       ) {
+        return origin;
+      }
+
+      if (env !== 'production' && isLocalDevOrigin(origin)) {
         return origin;
       }
 

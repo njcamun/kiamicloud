@@ -2,6 +2,7 @@ import '../api/kiami_api_config.dart';
 import '../api/models/kiami_plan.dart';
 import '../api/models/kiami_profile.dart';
 import '../api/models/kiami_quota.dart';
+import '../api/models/kiami_subscription_access.dart';
 import '../constants/kiami_constants.dart';
 import 'kiami_quota_normalize.dart';
 
@@ -38,6 +39,14 @@ abstract final class KiamiApiLimits {
         canUpload: true,
         warningAtPercent: 80,
         criticalAtPercent: 95,
+      ),
+      subscription: profile.subscription,
+      access: const KiamiSubscriptionAccess(
+        canUpload: true,
+        canDownload: true,
+        canShare: true,
+        status: 'active',
+        effectiveStatus: 'active',
       ),
       canSwitchApiEndpoint: profile.canSwitchApiEndpoint,
     );

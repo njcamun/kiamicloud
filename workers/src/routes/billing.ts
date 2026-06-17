@@ -23,6 +23,7 @@ import {
 import { ensureUser } from '../db/users';
 import { getPlanByCode } from '../config/plans';
 import { PAYMENT_INSTRUCTIONS } from '../config/payment-instructions';
+import { resolveSubscriptionAccessForUser } from '../db/subscriptions';
 
 export const billingRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -115,6 +116,23 @@ billingRoutes.get('/status', async (c) => {
     (ch) => ch.status === 'pending' || ch.status === 'awaiting_review',
   );
   const recentRejected = checkouts.filter((ch) => ch.status === 'rejected').slice(0, 3);
+  const access = localUnlimited
+    ? {
+        canUpload: true,
+        canDownload: true,
+        canShare: true,
+        status: 'active',
+        effectiveStatus: 'active',
+        blockReason: null,
+        storageOverQuota: false,
+      }
+    : await resolveSubscriptionAccessForUser(c.env.DB, {
+        firebaseUid: user.uid,
+        planCode: profile.plan.code,
+        storageUsedBytes: profile.storageUsedBytes,
+        quotaBytes: profile.plan.quotaBytes,
+        environment: c.env.ENVIRONMENT,
+      });
 
   return c.json({
     plan: profile.plan,
@@ -127,6 +145,7 @@ billingRoutes.get('/status', async (c) => {
           profile.plan.quotaBytes,
         ),
     subscription,
+    access,
     pendingCheckouts: localUnlimited ? [] : pending,
     recentRejectedCheckouts: localUnlimited ? [] : recentRejected,
     paymentsEnabled:
@@ -182,6 +201,10 @@ billingRoutes.post('/checkout', async (c) => {
       planName: result.planName,
       message: 'Plano alterado com sucesso.',
     });
+  }
+
+  if (!('checkout' in result)) {
+    return c.json({ error: 'checkout_failed', message: 'Checkout indisponível.' }, 500);
   }
 
   const { checkout, planName } = result;

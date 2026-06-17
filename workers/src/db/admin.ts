@@ -8,6 +8,7 @@ import {
   validateQuotaOverrideBytes,
 } from '../lib/effective_quota';
 import { insertAccountEvent } from './account_events';
+import { activateOrRenewSubscription } from './subscriptions';
 import {
   isLocalUnlimitedMode,
   LOCAL_UNLIMITED_QUOTA_BYTES,
@@ -465,41 +466,31 @@ export async function updateUserByAdmin(
     ? input.canSwitchApiEndpoint!
     : existing.canSwitchApiEndpoint;
 
-  await db.batch([
-    db
-      .prepare(
-        `UPDATE users SET
-           plan_code = ?,
-           quota_bytes_override = ?,
-           max_file_size_bytes_override = ?,
-           can_switch_api_endpoint = ?,
-           updated_at = datetime('now')
-         WHERE firebase_uid = ?`,
-      )
-      .bind(
-        planCode,
-        quotaOverride,
-        transferOverride,
-        canSwitchApiEndpoint ? 1 : 0,
-        input.targetUid,
-      ),
-    ...(hasPlanChange
-      ? [
-          db
-            .prepare(
-              `UPDATE subscriptions SET status = 'cancelled', updated_at = datetime('now')
-               WHERE firebase_uid = ? AND status = 'active'`,
-            )
-            .bind(input.targetUid),
-          db
-            .prepare(
-              `INSERT INTO subscriptions (id, firebase_uid, plan_code, status, started_at)
-               VALUES (?, ?, ?, 'active', datetime('now'))`,
-            )
-            .bind(crypto.randomUUID(), input.targetUid, planCode),
-        ]
-      : []),
-  ]);
+  await db
+    .prepare(
+      `UPDATE users SET
+         plan_code = ?,
+         quota_bytes_override = ?,
+         max_file_size_bytes_override = ?,
+         can_switch_api_endpoint = ?,
+         updated_at = datetime('now')
+       WHERE firebase_uid = ?`,
+    )
+    .bind(
+      planCode,
+      quotaOverride,
+      transferOverride,
+      canSwitchApiEndpoint ? 1 : 0,
+      input.targetUid,
+    )
+    .run();
+
+  if (hasPlanChange) {
+    await activateOrRenewSubscription(db, {
+      firebaseUid: input.targetUid,
+      planCode,
+    });
+  }
 
   const changes: Record<string, unknown> = {};
   if (hasPlanChange) {

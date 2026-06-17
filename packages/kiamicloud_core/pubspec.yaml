@@ -1,6 +1,6 @@
 name: kiamicloud_core
 description: Núcleo partilhado KiamiCloud — design system, rotas, widgets e ecrãs base.
-version: 0.1.0
+version: 0.6.0
 publish_to: none
 
 environment:

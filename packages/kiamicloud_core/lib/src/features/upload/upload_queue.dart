@@ -306,7 +306,10 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
           );
           if (e is KiamiApiException &&
               (e.errorCode == 'quota_exceeded' ||
-                  e.errorCode == 'file_too_large')) {
+                  e.errorCode == 'file_too_large' ||
+                  e.errorCode == 'subscription_restricted' ||
+                  e.errorCode == 'subscription_suspended' ||
+                  e.errorCode == 'storage_over_quota')) {
             break;
           }
           await Future<void>.delayed(

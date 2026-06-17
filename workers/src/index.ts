@@ -17,6 +17,7 @@ import { supportRoutes } from './routes/support';
 import { publicRoutes } from './routes/public';
 import { bladeConsoleRoutes } from './routes/blade-console';
 import { runTrashPurge } from './scheduled/trash_purge';
+import { runSubscriptionLifecycleJob } from './scheduled/subscription_lifecycle';
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -89,9 +90,14 @@ export default {
     ctx: ExecutionContext,
   ): void {
     ctx.waitUntil(
-      runTrashPurge(env).catch((err) => {
-        console.error('[trash-purge] scheduled failed', err);
-      }),
+      Promise.all([
+        runTrashPurge(env).catch((err) => {
+          console.error('[trash-purge] scheduled failed', err);
+        }),
+        runSubscriptionLifecycleJob(env).catch((err) => {
+          console.error('[subscription-lifecycle] scheduled failed', err);
+        }),
+      ]),
     );
   },
 };

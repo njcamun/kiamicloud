@@ -1,6 +1,6 @@
 {
   "name": "kiamicloud-api",
-  "version": "0.1.0",
+  "version": "0.6.0",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
@@ -10,6 +10,7 @@
     "deploy:production": "wrangler deploy --env production",
     "smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/smoke-test-api.ps1",
     "typecheck": "tsc --noEmit",
+    "test:subscription-access": "npx tsx scripts/test-subscription-access.ts",
     "db:migrate:local": "wrangler d1 migrations apply kiamicloud-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply kiamicloud-db --remote",
     "db:studio:local": "wrangler d1 execute kiamicloud-db --local --command \"SELECT code, name, quota_bytes FROM plans\"",

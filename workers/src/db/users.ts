@@ -2,6 +2,7 @@ import { effectiveMaxFileSizeBytes } from '../lib/effective_max_file';
 import { effectiveQuotaBytes } from '../lib/effective_quota';
 import type { AuthUser } from '../types';
 import type { UserProfile, UserRow } from './schema';
+import { ensureFreeSubscription } from './subscriptions';
 
 const USER_WITH_PLAN_SQL = `
   SELECT
@@ -97,6 +98,8 @@ export async function ensureUser(
         auth.picture ?? null,
       )
       .run();
+
+    await ensureFreeSubscription(db, auth.uid);
 
     const created = await fetchProfile(db, auth.uid);
     if (!created) {

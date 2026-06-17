@@ -2,6 +2,7 @@ import 'kiami_checkout.dart';
 import 'kiami_payment_instructions.dart';
 import 'kiami_plan.dart';
 import 'kiami_quota.dart';
+import 'kiami_subscription_access.dart';
 import '../../utils/kiami_quota_normalize.dart';
 
 class KiamiSubscription {
@@ -9,23 +10,36 @@ class KiamiSubscription {
     required this.id,
     required this.planCode,
     required this.status,
+    required this.effectiveStatus,
     required this.startedAt,
     this.endsAt,
+    this.gracePeriodEndsAt,
+    this.deletionScheduledAt,
+    this.autoRenew = false,
   });
 
   final String id;
   final String planCode;
   final String status;
+  final String effectiveStatus;
   final String startedAt;
   final String? endsAt;
+  final String? gracePeriodEndsAt;
+  final String? deletionScheduledAt;
+  final bool autoRenew;
 
   factory KiamiSubscription.fromJson(Map<String, dynamic> json) {
     return KiamiSubscription(
       id: json['id'] as String,
       planCode: json['planCode'] as String,
       status: json['status'] as String,
+      effectiveStatus:
+          json['effectiveStatus'] as String? ?? json['status'] as String,
       startedAt: json['startedAt'] as String,
       endsAt: json['endsAt'] as String?,
+      gracePeriodEndsAt: json['gracePeriodEndsAt'] as String?,
+      deletionScheduledAt: json['deletionScheduledAt'] as String?,
+      autoRenew: json['autoRenew'] as bool? ?? false,
     );
   }
 }
@@ -37,6 +51,7 @@ class KiamiBillingStatus {
     required this.storageAvailableBytes,
     required this.quota,
     this.subscription,
+    this.access,
     required this.pendingCheckouts,
     required this.recentRejectedCheckouts,
     required this.paymentsEnabled,
@@ -49,6 +64,7 @@ class KiamiBillingStatus {
   final int storageAvailableBytes;
   final KiamiQuotaInfo quota;
   final KiamiSubscription? subscription;
+  final KiamiSubscriptionAccess? access;
   final List<KiamiCheckout> pendingCheckouts;
   final List<KiamiCheckout> recentRejectedCheckouts;
   final bool paymentsEnabled;
@@ -66,6 +82,7 @@ class KiamiBillingStatus {
     final pending = json['pendingCheckouts'] as List<dynamic>? ?? [];
     final rejected = json['recentRejectedCheckouts'] as List<dynamic>? ?? [];
     final subJson = json['subscription'];
+    final accessJson = json['access'];
     final instructionsJson = json['paymentInstructions'] as Map<String, dynamic>?;
     final planRaw = KiamiPlan.fromJson(json['plan'] as Map<String, dynamic>);
     final plan = KiamiPlan(
@@ -82,6 +99,9 @@ class KiamiBillingStatus {
       quota: KiamiQuotaInfo.fromJson(json['quota'] as Map<String, dynamic>),
       subscription: subJson != null
           ? KiamiSubscription.fromJson(subJson as Map<String, dynamic>)
+          : null,
+      access: accessJson is Map<String, dynamic>
+          ? KiamiSubscriptionAccess.fromJson(accessJson)
           : null,
       pendingCheckouts: pending
           .map((e) => KiamiCheckout.fromJson(e as Map<String, dynamic>))

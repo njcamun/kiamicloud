@@ -395,3 +395,74 @@ class KiamiSecurityEvent {
     );
   }
 }
+
+class KiamiAdminSubscription {
+  const KiamiAdminSubscription({
+    required this.id,
+    required this.firebaseUid,
+    required this.planCode,
+    required this.status,
+    required this.effectiveStatus,
+    required this.startedAt,
+    this.endsAt,
+    this.gracePeriodEndsAt,
+    this.deletionScheduledAt,
+    this.autoRenew = false,
+    this.email,
+    this.displayName,
+    this.storageUsedBytes = 0,
+  });
+
+  final String id;
+  final String firebaseUid;
+  final String planCode;
+  final String status;
+  final String effectiveStatus;
+  final String startedAt;
+  final String? endsAt;
+  final String? gracePeriodEndsAt;
+  final String? deletionScheduledAt;
+  final bool autoRenew;
+  final String? email;
+  final String? displayName;
+  final int storageUsedBytes;
+
+  factory KiamiAdminSubscription.fromJson(Map<String, dynamic> json) {
+    return KiamiAdminSubscription(
+      id: json['id'] as String,
+      firebaseUid: json['firebaseUid'] as String,
+      planCode: json['planCode'] as String,
+      status: json['status'] as String,
+      effectiveStatus:
+          json['effectiveStatus'] as String? ?? json['status'] as String,
+      startedAt: json['startedAt'] as String,
+      endsAt: json['endsAt'] as String?,
+      gracePeriodEndsAt: json['gracePeriodEndsAt'] as String?,
+      deletionScheduledAt: json['deletionScheduledAt'] as String?,
+      autoRenew: json['autoRenew'] as bool? ?? false,
+      email: json['email'] as String?,
+      displayName: json['displayName'] as String?,
+      storageUsedBytes: (json['storageUsedBytes'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class KiamiAdminSubscriptionList {
+  const KiamiAdminSubscriptionList({
+    required this.items,
+    required this.total,
+  });
+
+  final List<KiamiAdminSubscription> items;
+  final int total;
+
+  factory KiamiAdminSubscriptionList.fromJson(Map<String, dynamic> json) {
+    final list = json['items'] as List<dynamic>? ?? [];
+    return KiamiAdminSubscriptionList(
+      items: list
+          .map((e) => KiamiAdminSubscription.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      total: (json['total'] as num?)?.toInt() ?? list.length,
+    );
+  }
+}

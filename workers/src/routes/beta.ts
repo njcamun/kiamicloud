@@ -3,6 +3,7 @@ import type { AppVariables, Env } from '../types';
 import { requireAuth } from '../middleware/auth';
 import { rateLimitByUser } from '../middleware/rate-limit';
 import { insertAccountEvent } from '../db/account_events';
+import { API_VERSION } from '../config/version';
 
 export const betaRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -10,7 +11,7 @@ export const betaRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>()
 betaRoutes.get('/info', (c) =>
   c.json({
     program: 'KiamiCloud Beta',
-    version: '0.5.0-beta',
+    version: API_VERSION,
     environment: c.env.ENVIRONMENT ?? 'unknown',
     feedbackEnabled: true,
     knownLimitations: [

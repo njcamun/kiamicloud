@@ -6,7 +6,13 @@ export type SecurityEventType =
   | 'checkout_created'
   | 'checkout_paid'
   | 'checkout_proof_submitted'
-  | 'checkout_rejected';
+  | 'checkout_rejected'
+  | 'subscription_renewed'
+  | 'subscription_grace_period'
+  | 'subscription_restricted'
+  | 'subscription_suspended'
+  | 'subscription_pending_deletion'
+  | 'subscription_admin_adjust';
 
 export async function logSecurityEvent(
   db: D1Database,

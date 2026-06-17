@@ -2,8 +2,8 @@
 
 ## Versão
 
-- **App:** `0.5.0-beta`
-- **API:** `0.5.0-beta` (`GET /health`)
+- **App:** `0.6.0-beta`
+- **API:** `0.6.0-beta` (`GET /health`)
 
 ## O que inclui o beta
 

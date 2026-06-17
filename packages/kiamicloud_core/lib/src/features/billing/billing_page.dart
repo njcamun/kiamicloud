@@ -19,6 +19,7 @@ import '../../utils/upload_file_reader.dart';
 import '../../widgets/kiami_api_unavailable_card.dart';
 import '../../widgets/kiami_button.dart';
 import '../../widgets/kiami_card.dart';
+import '../../widgets/subscription_banner.dart';
 import '../files/providers/files_providers.dart';
 import '../activity/providers/account_activity_providers.dart';
 import 'providers/billing_providers.dart';
@@ -408,6 +409,12 @@ class _CurrentPlanCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
+            if (status.subscription != null || status.access != null) ...[
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              _SubscriptionSection(status: status),
+            ],
           ],
         ),
       ),
@@ -431,6 +438,75 @@ class _CurrentPlanCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SubscriptionSection extends StatelessWidget {
+  const _SubscriptionSection({required this.status});
+
+  final KiamiBillingStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = status.subscription;
+    final access = status.access;
+    final effective = sub?.effectiveStatus ?? access?.effectiveStatus ?? 'active';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          KiamiStrings.subscriptionStatusTitle,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          subscriptionStatusLabel(effective),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        if (sub?.endsAt != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            '${KiamiStrings.subscriptionEndsAt}: ${_formatDate(sub!.endsAt!)}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+        if (sub?.gracePeriodEndsAt != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            '${KiamiStrings.subscriptionGraceEndsAt}: ${_formatDate(sub!.gracePeriodEndsAt!)}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+        if (sub?.deletionScheduledAt != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            '${KiamiStrings.subscriptionDeletionAt}: ${_formatDate(sub!.deletionScheduledAt!)}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.w500,
+                ),
+          ),
+        ],
+        if (access != null && access.needsAttention) ...[
+          const SizedBox(height: 10),
+          SubscriptionBanner(access: access),
+        ],
+      ],
+    );
+  }
+}
+
+String _formatDate(String iso) {
+  final dt = DateTime.tryParse(iso);
+  if (dt == null) return iso;
+  final local = dt.toLocal();
+  final d = local.day.toString().padLeft(2, '0');
+  final m = local.month.toString().padLeft(2, '0');
+  return '$d/$m/${local.year}';
 }
 
 class _ActiveCheckoutCard extends StatelessWidget {

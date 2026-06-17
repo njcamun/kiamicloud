@@ -5,13 +5,29 @@ export type AccountEventKind =
   | 'billing_rejected'
   | 'support_sent'
   | 'support_reviewed'
-  | 'quota_updated';
+  | 'quota_updated'
+  | 'subscription_expiring'
+  | 'subscription_grace'
+  | 'subscription_restricted'
+  | 'subscription_suspended'
+  | 'subscription_pending_deletion'
+  | 'subscription_reactivated'
+  | 'subscription_renewed'
+  | 'subscription_deleted';
 
 const NOTIFICATION_KINDS: AccountEventKind[] = [
   'billing_paid',
   'billing_rejected',
   'support_reviewed',
   'quota_updated',
+  'subscription_expiring',
+  'subscription_grace',
+  'subscription_restricted',
+  'subscription_suspended',
+  'subscription_pending_deletion',
+  'subscription_reactivated',
+  'subscription_renewed',
+  'subscription_deleted',
 ];
 
 export type AccountEventDto = {
@@ -120,7 +136,9 @@ export async function listAccountEventsForUser(
   return (results ?? []).map(mapEvent);
 }
 
-const UNREAD_NOTIFICATION_KINDS_SQL = `'billing_paid', 'billing_rejected', 'support_reviewed', 'quota_updated'`;
+const UNREAD_NOTIFICATION_KINDS_SQL = NOTIFICATION_KINDS.map((k) => `'${k}'`).join(
+  ', ',
+);
 
 export async function countUnreadAccountEvents(
   db: D1Database,

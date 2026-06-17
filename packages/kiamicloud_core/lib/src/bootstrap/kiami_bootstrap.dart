@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
@@ -28,10 +29,17 @@ Future<void> kiamiBootstrap({
       ? apiBaseUrl.trim()
       : KiamiConstants.cloudBetaApiBaseUrl;
 
-  resolvedApi = await ApiEndpointStore.loadEffectiveUrl(
-    cloudDefault: resolvedApi,
-  );
+  var mode = await ApiEndpointStore.getMode();
+  if (kIsWeb && mode == KiamiApiEndpointMode.local) {
+    await ApiEndpointStore.clear();
+    mode = KiamiApiEndpointMode.cloud;
+    resolvedApi = resolvedApi.replaceAll(RegExp(r'/+$'), '');
+  } else {
+    resolvedApi = await ApiEndpointStore.loadEffectiveUrl(
+      cloudDefault: resolvedApi,
+    );
+    mode = await ApiEndpointStore.getMode();
+  }
 
-  final mode = await ApiEndpointStore.getMode();
   KiamiApiConfig.configure(resolvedApi, mode: mode);
 }

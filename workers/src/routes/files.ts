@@ -28,6 +28,7 @@ import {
   revokeFileShare,
 } from '../db/shares';
 import { canPresignR2, presignGet, presignPut } from '../lib/r2-presign';
+import { enforceSubscriptionAccess } from '../middleware/subscription-access';
 
 export const filesRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
@@ -68,6 +69,9 @@ filesRoutes.delete('/shares/:shareId', async (c) => {
 
 /** Inicia upload: valida quota, regista pendente, devolve URL de upload. */
 filesRoutes.post('/upload/init', async (c) => {
+  const blocked = await enforceSubscriptionAccess(c, 'upload');
+  if (blocked) return blocked;
+
   const user = c.get('user');
   const body = await c.req.json<{
     name?: string;
@@ -422,6 +426,9 @@ filesRoutes.post('/upload/complete', async (c) => {
 
 /** Cria link de partilha pública (só leitura). */
 filesRoutes.post('/:fileId/shares', async (c) => {
+  const blocked = await enforceSubscriptionAccess(c, 'share');
+  if (blocked) return blocked;
+
   const user = c.get('user');
   const fileId = c.req.param('fileId');
   const body = (await c.req
@@ -614,6 +621,9 @@ filesRoutes.get('/thumbnail/direct/:fileId', async (c) => {
 
 /** URL pre-assinada GET temporaria para download. */
 filesRoutes.get('/:fileId/download', async (c) => {
+  const blocked = await enforceSubscriptionAccess(c, 'download');
+  if (blocked) return blocked;
+
   const user = c.get('user');
   const fileId = c.req.param('fileId');
   const row = await getFileById(c.env.DB, fileId, user.uid);
@@ -654,6 +664,9 @@ filesRoutes.get('/:fileId/download', async (c) => {
 
 /** Download directo via Worker (dev local). */
 filesRoutes.get('/download/direct/:fileId', async (c) => {
+  const blocked = await enforceSubscriptionAccess(c, 'download');
+  if (blocked) return blocked;
+
   const user = c.get('user');
   const fileId = c.req.param('fileId');
   const row = await getFileById(c.env.DB, fileId, user.uid);

@@ -198,6 +198,57 @@ abstract final class KiamiStrings {
   static const String billingDevSimulateHint =
       'Modo desenvolvimento: confirme o pagamento abaixo para activar o plano sem comprovativo.';
   static const String billingSimulatePay = 'Confirmar pagamento (dev)';
+  static const String subscriptionBannerAction = 'Renovar plano';
+  static const String subscriptionStatusTitle = 'Estado da subscrição';
+  static const String subscriptionStatusActive = 'Activa';
+  static const String subscriptionStatusGrace = 'Período de tolerância';
+  static const String subscriptionStatusRestricted = 'Restrita (só download)';
+  static const String subscriptionStatusSuspended = 'Suspensa';
+  static const String subscriptionStatusPendingDeletion = 'Eliminação agendada';
+  static const String subscriptionStatusCancelled = 'Cancelada';
+  static const String subscriptionEndsAt = 'Válida até';
+  static const String subscriptionGraceEndsAt = 'Tolerância até';
+  static const String subscriptionDeletionAt = 'Eliminação em';
+  static String subscriptionMessageFor({
+    required String effectiveStatus,
+    String? blockReason,
+  }) {
+    if (blockReason == 'storage_over_quota') {
+      return subscriptionStorageOverQuota;
+    }
+    return switch (effectiveStatus) {
+      'grace_period' => subscriptionGracePeriod,
+      'restricted' => subscriptionRestricted,
+      'suspended' => subscriptionSuspended,
+      'pending_deletion' => subscriptionPendingDeletion,
+      'deleted' => subscriptionDeleted,
+      _ => subscriptionInactive,
+    };
+  }
+
+  static const String subscriptionStorageOverQuota =
+      'O espaço utilizado excede o limite do plano. Remova ficheiros ou actualize a subscrição.';
+  static const String subscriptionGracePeriod =
+      'A subscrição expirou. Renove nos próximos dias para manter todos os acessos.';
+  static const String subscriptionRestricted =
+      'Subscrição em atraso: novos uploads bloqueados. Renove o plano para continuar.';
+  static const String subscriptionSuspended =
+      'Conta suspensa por falta de pagamento. Renove para recuperar acesso.';
+  static const String subscriptionPendingDeletion =
+      'Conta será eliminada em breve. Renove imediatamente para evitar perda de dados.';
+  static const String subscriptionDeleted = 'Conta eliminada.';
+  static const String subscriptionInactive =
+      'Operação não permitida no estado actual da subscrição.';
+  static const String subscriptionUploadBlocked =
+      'Upload bloqueado pelo estado da subscrição.';
+  static const String adminSubscriptionsTitle = 'Subscrições';
+  static const String adminSubscriptionsEmpty = 'Nenhuma subscrição encontrada.';
+  static const String adminSubscriptionsFilterAll = 'Todas';
+  static const String adminSubscriptionReactivate = 'Reactivar';
+  static const String adminSubscriptionReactivated = 'Subscrição reactivada.';
+  static const String adminSubscriptionAdjustEnds = 'Ajustar vencimento';
+  static const String adminSubscriptionEndsAtUpdated = 'Data de vencimento actualizada.';
+  static const String adminViewSubscriptions = 'Ver subscrições';
   static const String dashboardEmpty = 'Ainda não tens ficheiros na cloud.';
   static String dashboardEmptyHint(String maxPerFileLabel) =>
       'Carrega o teu primeiro ficheiro (até $maxPerFileLabel por ficheiro).';
@@ -477,13 +528,19 @@ abstract final class KiamiStrings {
   static const String legalAcceptanceContinue = 'Continuar';
   static const String settingsDangerSection = 'Zona de risco';
   static const String accountActivityTitle = 'Suporte e actividade';
+  static const String notificationsTitle = 'Notificações';
+  static const String notificationsTooltip = 'Notificações do plano';
+  static const String notificationsHint =
+      'Avisos sobre o plano, subscrição e armazenamento. Para suporte, use o ícone ao lado.';
+  static const String notificationsEmpty = 'Sem notificações.';
+  static const String notificationsMarkAllRead = 'Marcar todas como lidas';
   static const String accountActivityHint =
       'Historico de mensagens, pagamentos e notificações da conta.';
   static const String accountActivityEmpty =
       'Sem actividade registada. Envie uma mensagem ou faça upgrade de plano.';
   static const String accountActivityNewMessage = 'Nova mensagem';
   static const String adminActivityTitle = 'Actividade recente';
-  static const String adminUserActivityTitle = 'Historico suporte e billing';
+  static const String adminUserActivityTitle = 'Notificações do utilizador';
   static const String adminFeedbackTitle = 'Feedback beta';
   static const String adminNotConfigured =
       'Defina ADMIN_UIDS no wrangler.toml com o seu Firebase UID.';

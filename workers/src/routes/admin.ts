@@ -18,6 +18,11 @@ import {
   sendSupportMessageAsAdmin,
 } from '../db/support_chat';
 import {
+  adjustSubscriptionEndsAtAdmin,
+  listSubscriptionsAdmin,
+  reactivateSubscriptionAdmin,
+} from '../db/subscriptions';
+import {
   getPlatformStats,
   getUserAdminDetail,
   listBetaFeedbackAdmin,
@@ -375,4 +380,62 @@ adminRoutes.post('/feedback/:id/review', async (c) => {
     feedback: result.feedback,
     message: 'Feedback marcado como tratado.',
   });
+});
+
+/** Lista subscrições (filtro por estado). */
+adminRoutes.get('/subscriptions', async (c) => {
+  const status = c.req.query('status') ?? undefined;
+  const limit = Number(c.req.query('limit') ?? 25) || 25;
+  const offset = Number(c.req.query('offset') ?? 0) || 0;
+  const result = await listSubscriptionsAdmin(c.env.DB, { status, limit, offset });
+  return c.json(result);
+});
+
+/** Reativa subscrição de um utilizador. */
+adminRoutes.post('/subscriptions/:uid/reactivate', async (c) => {
+  const admin = c.get('user');
+  const uid = c.req.param('uid');
+  const body = (await c.req
+    .json<{ endsAtDays?: number }>()
+    .catch(() => ({}))) as { endsAtDays?: number };
+  const result = await reactivateSubscriptionAdmin(c.env.DB, {
+    firebaseUid: uid,
+    endsAtDays: body.endsAtDays,
+    adminUid: admin.uid,
+  });
+  if (!result.ok) {
+    return c.json({ error: 'reactivate_failed', message: result.error }, 400);
+  }
+  await logAdminAction(c.env.DB, {
+    adminUid: admin.uid,
+    action: 'subscription_reactivate',
+    targetUid: uid,
+    metadata: { endsAtDays: body.endsAtDays ?? 30 },
+  });
+  return c.json({ ok: true, message: 'Subscrição reactivada.' });
+});
+
+/** Ajusta data de vencimento. */
+adminRoutes.patch('/subscriptions/:uid', async (c) => {
+  const admin = c.get('user');
+  const uid = c.req.param('uid');
+  const body = await c.req.json<{ endsAt?: string }>();
+  if (!body.endsAt?.trim()) {
+    return c.json({ error: 'invalid_request', message: 'endsAt em falta.' }, 400);
+  }
+  const result = await adjustSubscriptionEndsAtAdmin(c.env.DB, {
+    firebaseUid: uid,
+    endsAt: body.endsAt.trim(),
+    adminUid: admin.uid,
+  });
+  if (!result.ok) {
+    return c.json({ error: 'update_failed', message: result.error }, 400);
+  }
+  await logAdminAction(c.env.DB, {
+    adminUid: admin.uid,
+    action: 'subscription_adjust_ends',
+    targetUid: uid,
+    metadata: { endsAt: body.endsAt },
+  });
+  return c.json({ ok: true, message: 'Data de vencimento actualizada.' });
 });

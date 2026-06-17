@@ -29,6 +29,11 @@ class KiamiAccountEvent {
 
   bool get isBilling => kind.startsWith('billing_');
   bool get isSupport => kind.startsWith('support_');
+  bool get isSubscription => kind.startsWith('subscription_');
+
+  /// Notificações de plano/subscrição (exclui suporte — usar ícone de suporte).
+  bool get isPlanNotification =>
+      isNotification && !isSupport;
 
   factory KiamiAccountEvent.fromJson(Map<String, dynamic> json) {
     final meta = json['metadata'];
@@ -56,6 +61,14 @@ class KiamiAccountEvent {
         'support_sent' => 'Suporte',
         'support_reviewed' => 'Suporte tratado',
         'quota_updated' => 'Limites actualizados',
+        'subscription_expiring' => 'Subscrição a expirar',
+        'subscription_grace' => 'Período de tolerância',
+        'subscription_restricted' => 'Uploads bloqueados',
+        'subscription_suspended' => 'Conta suspensa',
+        'subscription_pending_deletion' => 'Eliminação agendada',
+        'subscription_reactivated' => 'Subscrição reactivada',
+        'subscription_renewed' => 'Subscrição renovada',
+        'subscription_deleted' => 'Conta eliminada',
         _ => kind,
       };
 }

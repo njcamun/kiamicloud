@@ -8,6 +8,7 @@ import '../billing/providers/billing_providers.dart';
 import '../files/providers/files_providers.dart';
 import 'providers/admin_providers.dart';
 import 'widgets/admin_user_edit_form.dart';
+import 'widgets/admin_user_notifications_section.dart';
 
 class AdminUserDetailPage extends ConsumerWidget {
   const AdminUserDetailPage({super.key, required this.uid});
@@ -48,6 +49,7 @@ class AdminUserDetailPage extends ConsumerWidget {
                         ),
                   ),
                 ),
+              AdminUserNotificationsSection(uid: uid),
               AdminUserEditForm(
                 user: user,
                 plans: plans,

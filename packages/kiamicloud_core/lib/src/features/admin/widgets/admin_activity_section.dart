@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/models/kiami_account_event.dart';
 import '../../../constants/kiami_strings.dart';
-import '../../../theme/kiami_colors.dart';
-import '../../files/providers/files_providers.dart';
+import '../../activity/widgets/account_event_tile.dart';
 import '../../activity/providers/account_activity_providers.dart';
+import 'admin_user_notifications_section.dart';
 
 class AdminPlatformActivitySection extends ConsumerWidget {
   const AdminPlatformActivitySection({super.key});
@@ -51,40 +51,7 @@ class AdminUserActivitySection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activityAsync = ref.watch(adminUserAccountActivityProvider(uid));
-
-    return activityAsync.when(
-      data: (events) {
-        if (events.isEmpty) return const SizedBox.shrink();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              KiamiStrings.adminUserActivityTitle,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            ...events.map(
-              (e) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _AdminActivityTile(event: e, showUser: false),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        );
-      },
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, _) => Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: Text(kiamiApiErrorMessage(e)),
-      ),
-    );
+    return AdminUserNotificationsSection(uid: uid);
   }
 }
 
@@ -99,61 +66,24 @@ class _AdminActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final userLabel = event.userDisplayName ?? event.userEmail ?? event.firebaseUid;
+    final userLabel =
+        event.userDisplayName ?? event.userEmail ?? event.firebaseUid;
 
-    return Card(
-      color: event.isBilling
-          ? KiamiColors.warning.withValues(alpha: 0.05)
-          : KiamiColors.primaryBlue.withValues(alpha: 0.04),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  event.isBilling
-                      ? Icons.payment_outlined
-                      : Icons.support_agent_outlined,
-                  size: 18,
-                  color: scheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    event.title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showUser && (userLabel?.isNotEmpty ?? false))
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 4),
+            child: Text(
+              userLabel ?? '',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                ),
-                Text(
-                  event.createdAt,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                ),
-              ],
             ),
-            if (showUser && (userLabel?.isNotEmpty ?? false)) ...[
-              const SizedBox(height: 4),
-              Text(
-                userLabel ?? '',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-              ),
-            ],
-            const SizedBox(height: 6),
-            Text(
-              '${event.kindLabel} · ${event.body}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
+          ),
+        AccountEventTile(event: event),
+      ],
     );
   }
 }

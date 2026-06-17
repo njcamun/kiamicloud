@@ -16,6 +16,8 @@ import { buildMeProfileResponse } from '../lib/profile_response';
 
 import { isLocalTransferUnlimited, isLocalUnlimitedMode, unlimitedQuotaInfo, LOCAL_UNLIMITED_QUOTA_BYTES } from '../lib/local_unlimited';
 
+import { getSubscriptionDto, resolveSubscriptionAccessForUser } from '../db/subscriptions';
+
 
 
 export const meRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -94,52 +96,51 @@ meRoutes.get('/', async (c) => {
     ? { ...body.plan, maxFileSizeBytes: 0, quotaBytes: quotaBytesOut }
     : { ...body.plan, quotaBytes: quotaBytesOut };
 
-
+  const subscription = localUnlimited
+    ? null
+    : await getSubscriptionDto(db, auth.uid);
+  const access = localUnlimited
+    ? {
+        canUpload: true,
+        canDownload: true,
+        canShare: true,
+        status: 'active',
+        effectiveStatus: 'active',
+        blockReason: null,
+        storageOverQuota: false,
+      }
+    : await resolveSubscriptionAccessForUser(db, {
+        firebaseUid: auth.uid,
+        planCode: planOut.code,
+        storageUsedBytes: body.storageUsedBytes,
+        quotaBytes: quotaBytesOut,
+        environment: c.env.ENVIRONMENT,
+      });
 
   return c.json(
-
     {
-
       uid: body.uid,
-
       email: body.email,
-
       emailVerified: auth.emailVerified ?? false,
-
       displayName: body.displayName,
-
       photoUrl: body.photoUrl,
-
       plan: planOut,
-
       quotaBytes: quotaBytesOut,
-
       storageUsedBytes: body.storageUsedBytes,
-
       storageAvailableBytes: storageAvailableOut,
-
       maxFileSizeBytes,
-
       quotaBytesOverride: body.quotaBytesOverride,
-
       maxFileSizeBytesOverride: body.maxFileSizeBytesOverride,
-
       quota,
-
+      subscription,
+      access,
       canSwitchApiEndpoint: body.canSwitchApiEndpoint,
-
       createdAt: body.createdAt,
-
       updatedAt: body.updatedAt,
-
     },
-
     200,
-
     { 'Cache-Control': 'no-store' },
-
   );
-
 });
 
 

@@ -923,4 +923,57 @@ class KiamiApiClient {
         .map((e) => KiamiAuditAction.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  Future<KiamiAdminSubscriptionList> listAdminSubscriptions({
+    String? status,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    final headers = await _authHeaders();
+    final q = <String, String>{
+      'limit': '$limit',
+      'offset': '$offset',
+    };
+    if (status != null && status.isNotEmpty) q['status'] = status;
+    final uri = _uri('/admin/subscriptions').replace(queryParameters: q);
+    final response = await _run(
+      () => _http.get(uri, headers: headers),
+    );
+    if (response.statusCode != 200) _throwFromResponse(response);
+    return KiamiAdminSubscriptionList.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> reactivateAdminSubscription(
+    String uid, {
+    int? endsAtDays,
+  }) async {
+    final headers = await _authHeaders(jsonBody: true);
+    final body = <String, dynamic>{};
+    if (endsAtDays != null) body['endsAtDays'] = endsAtDays;
+    final response = await _run(
+      () => _http.post(
+        _uri('/admin/subscriptions/$uid/reactivate'),
+        headers: headers,
+        body: jsonEncode(body),
+      ),
+    );
+    if (response.statusCode != 200) _throwFromResponse(response);
+  }
+
+  Future<void> adjustAdminSubscriptionEndsAt({
+    required String uid,
+    required String endsAt,
+  }) async {
+    final headers = await _authHeaders(jsonBody: true);
+    final response = await _run(
+      () => _http.patch(
+        _uri('/admin/subscriptions/$uid'),
+        headers: headers,
+        body: jsonEncode({'endsAt': endsAt}),
+      ),
+    );
+    if (response.statusCode != 200) _throwFromResponse(response);
+  }
 }

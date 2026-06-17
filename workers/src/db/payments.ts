@@ -1,5 +1,6 @@
 import { getPlanByCode, NO_CHECKOUT_PLAN_CODES } from '../config/plans';
 import { insertAccountEvent } from './account_events';
+import { activateOrRenewSubscription, getSubscriptionDto } from './subscriptions';
 import { getUserProfile } from './users';
 import type { UserProfile } from './schema';
 import { logSecurityEvent } from './security';
@@ -42,8 +43,12 @@ export type SubscriptionDto = {
   id: string;
   planCode: string;
   status: string;
+  effectiveStatus: string;
   startedAt: string;
   endsAt: string | null;
+  gracePeriodEndsAt: string | null;
+  deletionScheduledAt: string | null;
+  autoRenew: boolean;
 };
 
 function mapCheckout(row: CheckoutRow): CheckoutDto {
@@ -118,19 +123,17 @@ export async function switchUserPlan(
     }
   }
 
-  await db.batch([
-    db
-      .prepare(
-        `UPDATE users SET plan_code = ?, updated_at = datetime('now') WHERE firebase_uid = ?`,
-      )
-      .bind(plan.code, input.firebaseUid),
-    db
-      .prepare(
-        `UPDATE subscriptions SET status = 'cancelled', updated_at = datetime('now')
-         WHERE firebase_uid = ? AND status = 'active'`,
-      )
-      .bind(input.firebaseUid),
-  ]);
+  await db
+    .prepare(
+      `UPDATE users SET plan_code = ?, updated_at = datetime('now') WHERE firebase_uid = ?`,
+    )
+    .bind(plan.code, input.firebaseUid)
+    .run();
+
+  await activateOrRenewSubscription(db, {
+    firebaseUid: input.firebaseUid,
+    planCode: plan.code,
+  });
 
   await logSecurityEvent(db, {
     eventType: 'plan_changed',
@@ -298,31 +301,7 @@ export async function getActiveSubscription(
   db: D1Database,
   firebaseUid: string,
 ): Promise<SubscriptionDto | null> {
-  const row = await db
-    .prepare(
-      `SELECT id, plan_code, status, started_at, ends_at
-       FROM subscriptions
-       WHERE firebase_uid = ? AND status = 'active'
-       ORDER BY started_at DESC
-       LIMIT 1`,
-    )
-    .bind(firebaseUid)
-    .first<{
-      id: string;
-      plan_code: string;
-      status: string;
-      started_at: string;
-      ends_at: string | null;
-    }>();
-
-  if (!row) return null;
-  return {
-    id: row.id,
-    planCode: row.plan_code,
-    status: row.status,
-    startedAt: row.started_at,
-    endsAt: row.ends_at,
-  };
+  return getSubscriptionDto(db, firebaseUid);
 }
 
 /**
@@ -391,9 +370,6 @@ export async function confirmCheckoutPayment(
   const plan = getPlanByCode(row.plan_code);
   if (!plan) return { ok: false, error: 'Plano do checkout invalido.' };
 
-  const subId = crypto.randomUUID();
-  const now = new Date().toISOString();
-
   await db.batch([
     db
       .prepare(
@@ -409,19 +385,12 @@ export async function confirmCheckoutPayment(
         `UPDATE users SET plan_code = ?, updated_at = datetime('now') WHERE firebase_uid = ?`,
       )
       .bind(row.plan_code, row.firebase_uid),
-    db
-      .prepare(
-        `UPDATE subscriptions SET status = 'cancelled', updated_at = datetime('now')
-         WHERE firebase_uid = ? AND status = 'active'`,
-      )
-      .bind(row.firebase_uid),
-    db
-      .prepare(
-        `INSERT INTO subscriptions (id, firebase_uid, plan_code, status, started_at)
-         VALUES (?, ?, ?, 'active', datetime('now'))`,
-      )
-      .bind(subId, row.firebase_uid, row.plan_code),
   ]);
+
+  await activateOrRenewSubscription(db, {
+    firebaseUid: row.firebase_uid,
+    planCode: row.plan_code,
+  });
 
   await logSecurityEvent(db, {
     eventType: 'checkout_paid',

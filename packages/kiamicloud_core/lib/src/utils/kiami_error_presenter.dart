@@ -35,6 +35,13 @@ class KiamiErrorPresenter {
           label: KiamiStrings.quotaLimitUpgradeButton,
           onPressed: () => context.push(KiamiRoutes.billing),
         ),
+      'subscription_restricted' ||
+      'subscription_suspended' ||
+      'storage_over_quota' =>
+        SnackBarAction(
+          label: KiamiStrings.subscriptionBannerAction,
+          onPressed: () => context.push(KiamiRoutes.billing),
+        ),
       'invalid_token' || 'unauthorized' => SnackBarAction(
           label: 'Entrar',
           onPressed: () => context.go(KiamiRoutes.auth),
