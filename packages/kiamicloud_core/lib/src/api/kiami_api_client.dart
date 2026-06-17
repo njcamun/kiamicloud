@@ -278,7 +278,7 @@ class KiamiApiClient {
     if (init.thumbnail != null &&
         canGenerateThumbnail(name, resolvedMime) &&
         bytes.length <= KiamiConstants.maxUploadBytes) {
-      final thumbBytes = encodeThumbnailJpeg(bytes);
+      final thumbBytes = await encodeThumbnailJpegAsync(bytes);
       if (thumbBytes != null) {
         try {
           file = await _uploadThumbnail(

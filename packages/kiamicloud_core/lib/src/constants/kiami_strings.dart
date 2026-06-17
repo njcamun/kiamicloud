@@ -155,6 +155,11 @@ abstract final class KiamiStrings {
   static const String previewMediaError =
       'Não foi possível reproduzir este ficheiro neste dispositivo. '
       'Use «Download» para o abrir noutra app.';
+  static const String galleryPrevious = 'Anterior';
+  static const String galleryNext = 'Seguinte';
+  static const String galleryNoPreview =
+      'Pré-visualização não disponível para este tipo de ficheiro.';
+  static String galleryPosition(int current, int total) => '$current / $total';
   static const String quotaBannerUpgradeHint = 'Toque para ver planos';
   static const String billingUpgradeSuccessAction = 'Ver armazenamento';
   static const String settingsAudit = 'Actividade recente';

@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../api/models/kiami_file.dart';
 import '../theme/kiami_decorations.dart';
-import '../utils/file_icon.dart';
 import '../utils/format_bytes.dart';
 import '../utils/format_date.dart';
 import 'kiami_card.dart';
 import 'kiami_file_actions_button.dart';
+import 'kiami_file_thumbnail.dart';
 
 /// Tile de ficheiro para vista em detalhes.
 class KiamiFileDetailTile extends StatelessWidget {
@@ -17,6 +17,7 @@ class KiamiFileDetailTile extends StatelessWidget {
     required this.onRename,
     required this.onDelete,
     required this.onShare,
+    this.onOpen,
   });
 
   final KiamiFile file;
@@ -24,29 +25,29 @@ class KiamiFileDetailTile extends StatelessWidget {
   final VoidCallback onRename;
   final VoidCallback onDelete;
   final VoidCallback onShare;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final icon = fileIconForName(file.name);
-    final iconColor = fileIconColorForName(file.name);
     final secondary = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return KiamiCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
-      onTap: onDownload,
+      onTap: onOpen ?? onDownload,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(KiamiDecorations.radiusMd),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(KiamiDecorations.radiusMd),
+            child: SizedBox(
+              width: 72,
+              height: 72,
+              child: KiamiFileThumbnail(
+                file: file,
+                height: 72,
+              ),
             ),
-            child: Icon(icon, color: iconColor, size: 26),
           ),
           const SizedBox(width: 14),
           Expanded(

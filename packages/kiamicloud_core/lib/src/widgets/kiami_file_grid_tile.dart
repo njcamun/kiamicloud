@@ -15,6 +15,7 @@ class KiamiFileGridTile extends StatelessWidget {
     required this.onRename,
     required this.onDelete,
     required this.onShare,
+    this.onOpen,
   });
 
   final KiamiFile file;
@@ -22,30 +23,41 @@ class KiamiFileGridTile extends StatelessWidget {
   final VoidCallback onRename;
   final VoidCallback onDelete;
   final VoidCallback onShare;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
     return KiamiCard(
-      padding: const EdgeInsets.all(12),
-      onTap: onDownload,
+      padding: const EdgeInsets.all(10),
+      onTap: onOpen ?? onDownload,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: KiamiFileThumbnail(file: file),
-              ),
-              KiamiFileActionsButton(
-                file: file,
-                onDownload: onDownload,
-                onRename: onRename,
-                onDelete: onDelete,
-                onShare: onShare,
-                iconSize: 20,
-              ),
-            ],
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: KiamiFileThumbnail(
+                    file: file,
+                    height: double.infinity,
+                  ),
+                ),
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: KiamiFileActionsButton(
+                    file: file,
+                    onDownload: onDownload,
+                    onRename: onRename,
+                    onDelete: onDelete,
+                    onShare: onShare,
+                    iconSize: 20,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 10),
           Text(
@@ -57,7 +69,7 @@ class KiamiFileGridTile extends StatelessWidget {
                   height: 1.2,
                 ),
           ),
-          const Spacer(),
+          const SizedBox(height: 4),
           Text(
             formatBytes(file.sizeBytes),
             style: Theme.of(context).textTheme.labelSmall,

@@ -14,7 +14,6 @@ import '../../widgets/kiami_file_row.dart';
 import '../../widgets/kiami_page_header.dart';
 import '../files/presentation/file_list_actions.dart';
 import '../files/presentation/file_list_sort.dart';
-import '../files/presentation/file_preview_page.dart';
 import '../files/providers/files_providers.dart';
 import '../../data/file_list_preferences.dart';
 
@@ -311,9 +310,10 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                   onSelectToggle: _selectionMode
                       ? () => _toggleSelection(file.id)
                       : null,
-                  onOpen: FilePreviewPage.canPreview(file)
-                      ? () => previewKiamiFile(file)
-                      : actions.onDownload,
+                  onOpen: () => previewKiamiFile(
+                    file,
+                    filesInContext: files,
+                  ),
                   onDownload: actions.onDownload,
                   onRename: actions.onRename,
                   onDelete: actions.onDelete,
@@ -332,7 +332,7 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
               crossAxisCount: _gridCrossAxisCount(width),
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 0.92,
+              childAspectRatio: 0.78,
             ),
             delegate: SliverChildBuilderDelegate(
               (context, index) {
@@ -340,9 +340,11 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                 final actions = _fileActions(file);
                 return KiamiFileGridTile(
                   file: file,
-                  onDownload: FilePreviewPage.canPreview(file)
-                      ? () => previewKiamiFile(file)
-                      : actions.onDownload,
+                  onOpen: () => previewKiamiFile(
+                    file,
+                    filesInContext: files,
+                  ),
+                  onDownload: actions.onDownload,
                   onRename: actions.onRename,
                   onDelete: actions.onDelete,
                   onShare: actions.onShare,
@@ -362,6 +364,10 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                 final actions = _fileActions(file);
                 return KiamiFileDetailTile(
                   file: file,
+                  onOpen: () => previewKiamiFile(
+                    file,
+                    filesInContext: files,
+                  ),
                   onDownload: actions.onDownload,
                   onRename: actions.onRename,
                   onDelete: actions.onDelete,

@@ -8,10 +8,14 @@ import '../../../api/models/kiami_file.dart';
 import '../../../constants/kiami_strings.dart';
 import '../../../data/offline_cache.dart';
 import '../../../data/offline_mutation_queue.dart';
+import '../../../utils/docx_preview.dart';
+import '../../../utils/pdf_preview.dart';
+import '../../../utils/text_preview.dart';
 import '../../connectivity/connectivity_provider.dart';
 import '../providers/files_providers.dart';
 import '../../../utils/kiami_error_presenter.dart';
 import 'file_actions_dialogs.dart';
+import 'file_gallery_page.dart';
 import 'file_preview_page.dart';
 
 /// Acções partilhadas (download, renomear, apagar) em listas de ficheiros.
@@ -49,15 +53,48 @@ mixin KiamiFileListActions<T extends ConsumerStatefulWidget>
     }
   }
 
-  Future<void> previewKiamiFile(KiamiFile file) async {
-    await FilePreviewPage.openIfSupported(
+  Future<void> previewKiamiFile(
+    KiamiFile file, {
+    List<KiamiFile>? filesInContext,
+  }) async {
+    final contextFiles = filesInContext ?? [file];
+    final index = contextFiles.indexWhere((f) => f.id == file.id);
+    if (index < 0) return;
+
+    if (FilePreviewPage.canPreview(file)) {
+      if (canPreviewTextFileName(file.name) &&
+          file.sizeBytes > kTextPreviewMaxBytes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(KiamiStrings.previewTextTooLarge)),
+        );
+        return;
+      }
+      if (canPreviewPdfFileName(file.name) &&
+          file.sizeBytes > kPdfPreviewMaxBytes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(KiamiStrings.previewPdfTooLarge)),
+        );
+        return;
+      }
+      if (canPreviewDocxFileName(file.name) &&
+          file.sizeBytes > kDocxPreviewMaxBytes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(KiamiStrings.previewDocxTooLarge)),
+        );
+        return;
+      }
+    }
+
+    await FileGalleryPage.open(
       context,
-      file: file,
-      loadBytes: () async => Uint8List.fromList(
-        await ref.read(kiamiApiClientProvider).downloadFileBytes(file.id),
+      files: contextFiles,
+      initialIndex: index,
+      loadBytes: (KiamiFile f) async => Uint8List.fromList(
+        await ref.read(kiamiApiClientProvider).downloadFileBytes(f.id),
       ),
-      loadMediaSource: () =>
-          ref.read(kiamiApiClientProvider).getFileDownloadInfo(file.id),
+      loadMediaSource: (KiamiFile f) =>
+          ref.read(kiamiApiClientProvider).getFileDownloadInfo(f.id),
+      onDownload: downloadKiamiFile,
     );
   }
 

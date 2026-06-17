@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
 const int kThumbnailMaxSide = 320;
@@ -7,6 +8,17 @@ const int kThumbnailJpegQuality = 82;
 
 /// Gera JPEG reduzido para miniatura na grelha. Devolve null se nao for imagem raster.
 Uint8List? encodeThumbnailJpeg(List<int> bytes) {
+  return _encodeThumbnailJpegImpl(bytes);
+}
+
+Future<Uint8List?> encodeThumbnailJpegAsync(List<int> bytes) {
+  if (bytes.length < 4096) {
+    return Future.value(encodeThumbnailJpeg(bytes));
+  }
+  return compute(_encodeThumbnailJpegImpl, bytes);
+}
+
+Uint8List? _encodeThumbnailJpegImpl(List<int> bytes) {
   try {
     final decoded = img.decodeImage(Uint8List.fromList(bytes));
     if (decoded == null) return null;

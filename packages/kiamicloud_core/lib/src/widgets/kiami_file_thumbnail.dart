@@ -39,18 +39,26 @@ class KiamiFileThumbnail extends ConsumerWidget {
         }
         return ClipRRect(
           borderRadius: radius,
-          child: Image.network(
-            thumb.url,
-            headers: thumb.headers,
-            height: height,
-            width: double.infinity,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-            cacheWidth: 320,
-            errorBuilder: (_, __, ___) => _iconBox(icon, iconColor, radius),
-            loadingBuilder: (context, child, progress) {
-              if (progress == null) return child;
-              return _iconBox(icon, iconColor, radius);
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final h = height == double.infinity
+                  ? constraints.maxHeight
+                  : height;
+              return Image.network(
+                thumb.url,
+                headers: thumb.headers,
+                height: h > 0 ? h : height,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                cacheWidth: 320,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (_, __, ___) => _iconBox(icon, iconColor, radius),
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return _iconBox(icon, iconColor, radius);
+                },
+              );
             },
           ),
         );

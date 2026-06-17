@@ -276,7 +276,6 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
                 mimeType: guessMimeType(item.name),
               );
           sessionSucceeded += 1;
-          _ref.invalidate(kiamiProfileProvider);
           _updateAt(
             index,
             item.copyWith(
@@ -284,7 +283,6 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
               clearBytes: true,
             ),
           );
-          await Future<void>.delayed(const Duration(milliseconds: 400));
           state = state.copyWith(
             items: state.items
                 .where((i) => i.status != UploadQueueItemStatus.completed)
@@ -321,7 +319,12 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
     } finally {
       state = state.copyWith(isProcessing: false);
       await _persist();
-      _ref.invalidate(kiamiFilesProvider);
+      if (sessionSucceeded > 0) {
+        _ref.invalidate(kiamiProfileProvider);
+        _ref.invalidate(kiamiFilesProvider);
+      } else if (sessionFailed > 0) {
+        _ref.invalidate(kiamiFilesProvider);
+      }
       if (sessionSucceeded > 0 || sessionFailed > 0) {
         _ref.read(uploadBatchResultProvider.notifier).state = UploadBatchResult(
           succeeded: sessionSucceeded,

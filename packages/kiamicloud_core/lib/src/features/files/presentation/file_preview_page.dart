@@ -26,6 +26,7 @@ class FilePreviewPage extends StatelessWidget {
     required this.kind,
     this.bytes,
     this.mediaSource,
+    this.embedded = false,
   });
 
   final KiamiFile file;
@@ -36,6 +37,9 @@ class FilePreviewPage extends StatelessWidget {
 
   /// URL + headers para streaming (vídeo, áudio).
   final MediaSource? mediaSource;
+
+  /// Sem AppBar — usado dentro da galeria.
+  final bool embedded;
 
   static bool isMediaKind(FilePreviewKind kind) =>
       kind == FilePreviewKind.video || kind == FilePreviewKind.audio;
@@ -54,6 +58,8 @@ class FilePreviewPage extends StatelessWidget {
     return false;
   }
 
+  static FilePreviewKind kindFor(KiamiFile file) => _kindFor(file);
+
   static FilePreviewKind _kindFor(KiamiFile file) {
     if (canPreviewPdfFile(file.name, file.sizeBytes)) {
       return FilePreviewKind.pdf;
@@ -67,26 +73,30 @@ class FilePreviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final body = switch (kind) {
+      FilePreviewKind.text => _TextBody(bytes: bytes!),
+      FilePreviewKind.pdf => _PdfBody(bytes: bytes!),
+      FilePreviewKind.image => _ImageBody(bytes: bytes!),
+      FilePreviewKind.docx => _DocxBody(bytes: bytes!),
+      FilePreviewKind.video => _MediaBody(
+          source: mediaSource!,
+          isAudio: false,
+          fileName: file.name,
+        ),
+      FilePreviewKind.audio => _MediaBody(
+          source: mediaSource!,
+          isAudio: true,
+          fileName: file.name,
+        ),
+    };
+
+    if (embedded) return body;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(file.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
-      body: switch (kind) {
-        FilePreviewKind.text => _TextBody(bytes: bytes!),
-        FilePreviewKind.pdf => _PdfBody(bytes: bytes!),
-        FilePreviewKind.image => _ImageBody(bytes: bytes!),
-        FilePreviewKind.docx => _DocxBody(bytes: bytes!),
-        FilePreviewKind.video => _MediaBody(
-            source: mediaSource!,
-            isAudio: false,
-            fileName: file.name,
-          ),
-        FilePreviewKind.audio => _MediaBody(
-            source: mediaSource!,
-            isAudio: true,
-            fileName: file.name,
-          ),
-      },
+      body: body,
     );
   }
 

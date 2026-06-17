@@ -486,7 +486,7 @@ packages:
       path: "../../../packages/kiamicloud_core"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.6.0"
   leak_tracker:
     dependency: transitive
     description:
