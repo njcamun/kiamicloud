@@ -67,7 +67,12 @@ export const kiamiCors = () =>
 
       return null;
     },
-    allowHeaders: ['Authorization', 'Content-Type', 'Accept'],
+    allowHeaders: [
+      'Authorization',
+      'Content-Type',
+      'Accept',
+      'X-Kiami-Upload-Via',
+    ],
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     exposeHeaders: ['Content-Length'],
     maxAge: 86400,

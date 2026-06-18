@@ -32,6 +32,13 @@ import { enforceSubscriptionAccess } from '../middleware/subscription-access';
 
 export const filesRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
+/** Browser / Flutter Web — evita PUT directo ao R2 (CORS). */
+function prefersWorkerUpload(c: {
+  req: { header: (name: string) => string | undefined };
+}): boolean {
+  return c.req.header('X-Kiami-Upload-Via') === 'worker';
+}
+
 filesRoutes.use('/*', requireAuth);
 filesRoutes.use('/*', rateLimitByUser);
 
@@ -137,11 +144,14 @@ filesRoutes.post('/upload/init', async (c) => {
     folderId: body.folderId,
   });
 
-  const expires = canPresignR2(c.env)
+  const origin = new URL(c.req.url).origin;
+  const viaWorker = prefersWorkerUpload(c);
+  const usePresignedR2 = canPresignR2(c.env) && !viaWorker;
+
+  const expires = usePresignedR2
     ? await presignPut(c.env, r2ObjectKey)
     : null;
 
-  const origin = new URL(c.req.url).origin;
   const uploadUrl = expires
     ? expires.url
     : `${origin}/files/upload/direct/${fileId}`;
@@ -160,7 +170,7 @@ filesRoutes.post('/upload/init', async (c) => {
   } | null = null;
 
   if (thumbR2ObjectKey) {
-    const thumbExpires = canPresignR2(c.env)
+    const thumbExpires = usePresignedR2
       ? await presignPut(c.env, thumbR2ObjectKey)
       : null;
     thumbnail = {
@@ -187,13 +197,13 @@ filesRoutes.post('/upload/init', async (c) => {
     thumbnail,
     instructions: expires
       ? 'Envie PUT para uploadUrl sem Authorization. Depois POST /files/upload/complete.'
-      : 'Modo local: PUT para uploadUrl com Authorization Bearer (sem credenciais R2). Depois POST /files/upload/complete.',
+      : 'PUT para uploadUrl com Authorization Bearer (proxy Worker). O ficheiro e activado na resposta.',
   });
 });
 
 /**
- * Upload directo via Worker (dev local sem API tokens R2).
- * Em producao usar URL pre-assinada de upload/init.
+ * Upload directo via Worker (dev local ou Flutter Web — evita CORS no R2).
+ * Em mobile/desktop nativo usar URL pre-assinada de upload/init.
  */
 filesRoutes.put('/upload/direct/:fileId', async (c) => {
   const user = c.get('user');

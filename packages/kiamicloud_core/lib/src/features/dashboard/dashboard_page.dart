@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,20 +8,21 @@ import '../../routing/kiami_routes.dart';
 
 import '../../constants/kiami_constants.dart';
 import '../../constants/kiami_strings.dart';
-import '../../theme/kiami_colors.dart';
 import '../../utils/file_category.dart';
 import '../../widgets/file_category_grid.dart';
 import '../files/presentation/file_list_actions.dart';
 import '../../utils/format_bytes.dart';
-import '../../theme/kiami_decorations.dart';
+import '../../theme/kiami_spacing.dart';
 import '../../widgets/global_file_search.dart';
 import '../../widgets/upload_drop_target.dart';
 import '../../widgets/upload_queue_panel.dart';
 import '../upload/upload_files_handler.dart';
 import '../upload/upload_queue.dart';
 import '../../widgets/kiami_api_unavailable_card.dart';
-import '../../widgets/kiami_card.dart';
+import '../../widgets/kiami_empty_state.dart';
+import '../../widgets/kiami_loading_skeleton.dart';
 import '../../widgets/kiami_page_header.dart';
+import '../../widgets/kiami_storage_card.dart';
 import '../../widgets/kiami_upload_zone.dart';
 import '../../widgets/quota_banner.dart';
 import '../../widgets/subscription_banner.dart';
@@ -30,7 +32,6 @@ import '../../utils/kiami_support_contact.dart';
 import '../../utils/kiami_layout.dart';
 import '../../utils/kiami_platform.dart';
 import '../../utils/kiami_api_limits.dart';
-import '../../utils/quota_ui.dart';
 import '../activity/providers/profile_quota_sync_provider.dart';
 import '../backup/device_backup_flow.dart';
 import '../backup/device_backup_restore_flow.dart';
@@ -83,8 +84,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
     try {
       final picked = await FilePicker.platform.pickFiles(
         allowMultiple: true,
-        withData: false,
-        withReadStream: true,
+        withData: kIsWeb,
+        withReadStream: !kIsWeb,
       );
       if (picked == null || picked.files.isEmpty) return;
       await _handlePickedFiles(picked.files);
@@ -216,8 +217,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                 constraints: BoxConstraints(
                   maxWidth: primaryMaxW ?? double.infinity,
                 ),
-                child: _StorageCard(
+                child: KiamiStorageCard(
                   profile: profile,
+                  onHelpTap: () => showKiamiStorageHelp(context),
                 ),
               ),
             ),
@@ -225,7 +227,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
         else if (fixedStorageOnMobile && profileAsync.isLoading)
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: _StorageCardSkeleton(),
+            child: const KiamiStorageCardSkeleton(),
           ),
         Expanded(
           child: RefreshIndicator(
@@ -259,7 +261,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                                   ),
                                   loading: () => fixedStorageOnMobile
                                       ? const SizedBox.shrink()
-                                      : const _StorageCardSkeleton(),
+                                      : const KiamiStorageCardSkeleton(),
                                   error: (e, _) => KiamiApiUnavailableCard(
                                     error: e,
                                     compact: true,
@@ -285,7 +287,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                     return SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 32),
-                        child: _EmptyState(maxPerFileLabel: maxLabel),
+                        child: KiamiEmptyState(
+                          icon: Icons.cloud_outlined,
+                          title: KiamiStrings.dashboardEmpty,
+                          subtitle: KiamiStrings.dashboardEmptyHint(maxLabel),
+                        ),
                       ),
                     );
                   }
@@ -318,10 +324,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                     ],
                   );
                 },
-                loading: () => const SliverToBoxAdapter(
+                loading: () => SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.all(48),
-                    child: Center(child: CircularProgressIndicator()),
+                    padding: EdgeInsets.fromLTRB(hPad, KiamiSpacing.lg, hPad, 0),
+                    child: KiamiFileGridSkeleton(
+                      crossAxisCount: isWide ? 4 : 2,
+                    ),
                   ),
                 ),
                 error: (e, _) => SliverToBoxAdapter(
@@ -386,9 +394,10 @@ class _DashboardTopSection extends StatelessWidget {
             ),
           ],
           if (!fixedStorageCard) ...[
-            _StorageCard(
+            KiamiStorageCard(
               profile: profile,
               expanded: fullWidthUpload,
+              onHelpTap: () => showKiamiStorageHelp(context),
             ),
             const SizedBox(height: 16),
           ],
@@ -416,190 +425,6 @@ class _DashboardTopSection extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _StorageCard extends StatelessWidget {
-  const _StorageCard({
-    required this.profile,
-    this.expanded = false,
-  });
-
-  final KiamiProfile profile;
-  final bool expanded;
-
-  @override
-  Widget build(BuildContext context) {
-    final used = profile.storageUsedBytes;
-    final unlimited = !KiamiApiLimits.enforced;
-    final quotaBytes = profile.plan.quotaBytes;
-    final ratio = unlimited
-        ? 0.0
-        : (quotaBytes > 0 ? (used / quotaBytes).clamp(0.0, 1.0) : 0.0);
-    final percent = profile.quota.usagePercent.toStringAsFixed(1);
-    final barColor = QuotaUi.barColor(profile.quota.status);
-    final planLabel = profile.plan.name;
-
-    final narrow = MediaQuery.sizeOf(context).width < 400;
-    return KiamiCard(
-      padding: EdgeInsets.symmetric(
-        horizontal: expanded ? 24 : (narrow ? 14 : 16),
-        vertical: expanded ? 22 : (narrow ? 16 : 18),
-      ),
-      child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.storage, color: barColor, size: expanded ? 26 : 24),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    KiamiStrings.storageUsed,
-                    style: (expanded
-                            ? Theme.of(context).textTheme.headlineSmall
-                            : Theme.of(context).textTheme.titleLarge)
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: KiamiColors.primaryBlue.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    planLabel,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: KiamiColors.primaryBlue,
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (!unlimited)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(KiamiDecorations.radiusSm),
-                child: ratio == 0
-                    ? LinearProgressIndicator(
-                        value: 0,
-                        minHeight: expanded ? 12 : 10,
-                        backgroundColor: Theme.of(context).brightness ==
-                                Brightness.dark
-                            ? KiamiColors.cloudBlue.withValues(alpha: 0.12)
-                            : KiamiColors.lightGray,
-                        color: barColor,
-                      )
-                    : TweenAnimationBuilder<double>(
-                        key: ValueKey('${profile.plan.code}-$quotaBytes-$used'),
-                        duration: const Duration(milliseconds: 550),
-                        curve: Curves.easeOutCubic,
-                        tween: Tween<double>(begin: 0, end: ratio),
-                        builder: (context, value, _) {
-                          final isDark =
-                              Theme.of(context).brightness == Brightness.dark;
-                          return LinearProgressIndicator(
-                            value: value,
-                            minHeight: expanded ? 12 : 10,
-                            backgroundColor: isDark
-                                ? KiamiColors.cloudBlue.withValues(alpha: 0.12)
-                                : KiamiColors.lightGray,
-                            color: barColor,
-                          );
-                        },
-                      ),
-              ),
-            if (!unlimited) const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  unlimited
-                      ? '${formatBytes(used)} · ${KiamiStrings.noTransferLimit}'
-                      : '${formatBytes(used)} / ${formatBytes(quotaBytes)}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                if (!unlimited)
-                  Text(
-                    '$percent% ${KiamiStrings.storagePercent}',
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-              ],
-            ),
-          ],
-        ),
-    );
-  }
-}
-
-class _StorageCardSkeleton extends StatelessWidget {
-  const _StorageCardSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return const KiamiCard(
-      child: Center(
-        child: SizedBox(
-          height: 28,
-          width: 28,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.maxPerFileLabel});
-
-  final String maxPerFileLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isDark
-                ? KiamiColors.darkSurfaceElevated
-                : KiamiColors.softWhite,
-            boxShadow: [
-              BoxShadow(
-                color: KiamiColors.primaryBlue.withValues(alpha: 0.12),
-                blurRadius: 32,
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.cloud_outlined,
-            size: 56,
-            color: KiamiColors.primaryBlue,
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          KiamiStrings.dashboardEmpty,
-          style: Theme.of(context).textTheme.titleLarge,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Text(
-            KiamiStrings.dashboardEmptyHint(maxPerFileLabel),
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ],
     );
   }
 }

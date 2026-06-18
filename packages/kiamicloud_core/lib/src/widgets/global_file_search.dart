@@ -7,6 +7,8 @@ import '../constants/kiami_strings.dart';
 import '../routing/kiami_routes.dart';
 import '../utils/file_category.dart';
 import '../utils/format_bytes.dart';
+import 'kiami_empty_state.dart';
+import 'kiami_file_thumbnail.dart';
 
 /// Pesquisa global de ficheiros (atalho Ctrl+K / Cmd+K).
 class GlobalFileSearchDelegate extends SearchDelegate<KiamiFile?> {
@@ -46,23 +48,35 @@ class GlobalFileSearchDelegate extends SearchDelegate<KiamiFile?> {
         : files.where((f) => f.name.toLowerCase().contains(q)).toList();
 
     if (results.isEmpty) {
-      return Center(
-        child: Text(
-          KiamiStrings.categorySearchEmpty,
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
+      return KiamiEmptyState(
+        icon: Icons.search_off_rounded,
+        title: KiamiStrings.categorySearchEmpty,
+        compact: true,
       );
     }
 
-    return ListView.builder(
+    return ListView.separated(
       itemCount: results.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final file = results[index];
         final category = fileCategoryForName(file.name);
         return ListTile(
-          leading: Icon(category.icon, color: category.accentColor),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: SizedBox(
+            width: 44,
+            height: 44,
+            child: KiamiFileThumbnail(file: file, height: 44),
+          ),
           title: Text(file.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text(formatBytes(file.sizeBytes)),
+          subtitle: Text(
+            '${category.label} · ${formatBytes(file.sizeBytes)}',
+          ),
+          trailing: Icon(
+            category.icon,
+            color: category.accentColor,
+            size: 20,
+          ),
           onTap: () {
             close(context, file);
             context.push(KiamiRoutes.categoryFilesFor(category));

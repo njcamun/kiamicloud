@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../constants/kiami_constants.dart';
@@ -227,6 +228,9 @@ class KiamiApiClient {
     String? mimeType,
   }) async {
     final headers = await _authHeaders(jsonBody: true);
+    if (kIsWeb) {
+      headers['X-Kiami-Upload-Via'] = 'worker';
+    }
     final body = jsonEncode({
       'name': name,
       'sizeBytes': sizeBytes,
@@ -262,7 +266,9 @@ class KiamiApiClient {
 
     if (putResponse.statusCode < 200 || putResponse.statusCode >= 300) {
       throw KiamiApiException(
-        'Falha ao enviar ficheiro (${putResponse.statusCode}).',
+        kIsWeb
+            ? 'Falha ao enviar ficheiro (${putResponse.statusCode}). Verifique a ligacao e tente novamente.'
+            : 'Falha ao enviar ficheiro (${putResponse.statusCode}).',
         statusCode: putResponse.statusCode,
       );
     }

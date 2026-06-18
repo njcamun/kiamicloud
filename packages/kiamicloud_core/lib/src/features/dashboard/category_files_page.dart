@@ -6,16 +6,37 @@ import '../../api/models/kiami_file.dart';
 import '../../constants/kiami_strings.dart';
 import '../../utils/file_category.dart';
 import '../../utils/kiami_layout.dart';
-import '../../widgets/category_illustration.dart';
 import '../../widgets/file_list_toolbar.dart';
+import '../../widgets/kiami_category_banner.dart';
+import '../../widgets/kiami_empty_state.dart';
 import '../../widgets/kiami_file_detail_tile.dart';
 import '../../widgets/kiami_file_grid_tile.dart';
 import '../../widgets/kiami_file_row.dart';
+import '../../widgets/kiami_loading_skeleton.dart';
 import '../../widgets/kiami_page_header.dart';
+import '../../widgets/kiami_search_bar.dart';
 import '../files/presentation/file_list_actions.dart';
 import '../files/presentation/file_list_sort.dart';
 import '../files/providers/files_providers.dart';
 import '../../data/file_list_preferences.dart';
+
+import '../../theme/kiami_spacing.dart';
+
+enum _AudioQuickFilter { all, music, recordings }
+
+bool _matchesAudioFilter(KiamiFile file, _AudioQuickFilter filter) {
+  if (filter == _AudioQuickFilter.all) return true;
+  final dot = file.name.lastIndexOf('.');
+  if (dot < 0) return filter == _AudioQuickFilter.all;
+  final ext = file.name.substring(dot + 1).toLowerCase();
+  const music = {'mp3', 'm4a', 'flac', 'ogg', 'aac', 'wma', 'opus'};
+  const recordings = {'wav', 'amr', 'caf', 'aiff', '3gp'};
+  return switch (filter) {
+    _AudioQuickFilter.music => music.contains(ext),
+    _AudioQuickFilter.recordings => recordings.contains(ext),
+    _AudioQuickFilter.all => true,
+  };
+}
 
 /// Lista de ficheiros de uma categoria (ecrã dedicado).
 class CategoryFilesPage extends ConsumerStatefulWidget {
@@ -30,6 +51,7 @@ class CategoryFilesPage extends ConsumerStatefulWidget {
 class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
     with KiamiFileListActions {
   String _searchQuery = '';
+  _AudioQuickFilter _audioFilter = _AudioQuickFilter.all;
   FileListViewMode _viewMode = FileListViewMode.list;
   FileListSortOption _sortOption = FileListSortOption.nameAsc;
   final _searchController = TextEditingController();
@@ -98,6 +120,12 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
     final q = _searchQuery.trim().toLowerCase();
     if (q.isNotEmpty) {
       files = files.where((f) => f.name.toLowerCase().contains(q)).toList();
+    }
+
+    if (widget.category == KiamiFileCategory.audio) {
+      files = files
+          .where((f) => _matchesAudioFilter(f, _audioFilter))
+          .toList();
     }
 
     return sortKiamiFiles(files, _sortOption);
@@ -190,39 +218,58 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: SizedBox(
-                                height: 100,
-                                width: double.infinity,
-                                child: CategoryIllustration(
-                                  category: widget.category,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                            KiamiCategoryBanner(
+                              category: widget.category,
+                              fileCount: files.length,
                             ),
-                            const SizedBox(height: 16),
-                            TextField(
+                            const SizedBox(height: KiamiSpacing.md),
+                            KiamiSearchBar(
                               controller: _searchController,
-                              decoration: InputDecoration(
-                                hintText: KiamiStrings.dashboardSearchHint,
-                                prefixIcon:
-                                    const Icon(Icons.search_rounded),
-                                suffixIcon: _searchQuery.isEmpty
-                                    ? null
-                                    : IconButton(
-                                        icon:
-                                            const Icon(Icons.clear_rounded),
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          setState(() => _searchQuery = '');
-                                        },
-                                      ),
-                              ),
                               onChanged: (v) =>
                                   setState(() => _searchQuery = v),
                             ),
-                            const SizedBox(height: 12),
+                            if (widget.category == KiamiFileCategory.audio) ...[
+                              const SizedBox(height: KiamiSpacing.sm),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    FilterChip(
+                                      label: Text(KiamiStrings.categoryFilterAll),
+                                      selected: _audioFilter ==
+                                          _AudioQuickFilter.all,
+                                      onSelected: (_) => setState(
+                                        () => _audioFilter =
+                                            _AudioQuickFilter.all,
+                                      ),
+                                    ),
+                                    const SizedBox(width: KiamiSpacing.sm),
+                                    FilterChip(
+                                      label: Text(KiamiStrings.audioFilterMusic),
+                                      selected: _audioFilter ==
+                                          _AudioQuickFilter.music,
+                                      onSelected: (_) => setState(
+                                        () => _audioFilter =
+                                            _AudioQuickFilter.music,
+                                      ),
+                                    ),
+                                    const SizedBox(width: KiamiSpacing.sm),
+                                    FilterChip(
+                                      label: Text(
+                                        KiamiStrings.audioFilterRecordings,
+                                      ),
+                                      selected: _audioFilter ==
+                                          _AudioQuickFilter.recordings,
+                                      onSelected: (_) => setState(
+                                        () => _audioFilter =
+                                            _AudioQuickFilter.recordings,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: KiamiSpacing.md),
                             FileListToolbar(
                               viewMode: _viewMode,
                               sortOption: _sortOption,
@@ -244,9 +291,14 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                     if (files.isEmpty)
                       SliverFillRemaining(
                         hasScrollBody: false,
-                        child: _CategoryEmptyState(
-                          hasSearch: _searchQuery.isNotEmpty,
-                          category: widget.category,
+                        child: KiamiEmptyState(
+                          icon: widget.category.icon,
+                          title: _searchQuery.isNotEmpty ||
+                                  _audioFilter != _AudioQuickFilter.all
+                              ? KiamiStrings.categorySearchEmpty
+                              : KiamiStrings.categoryFilesEmpty,
+                          iconColor: widget.category.accentColor,
+                          compact: true,
                         ),
                       )
                     else
@@ -259,7 +311,14 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                   ],
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => Center(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(hPad, KiamiSpacing.xl, hPad, 0),
+                  child: KiamiFileGridSkeleton(
+                    crossAxisCount: _gridCrossAxisCount(contentWidth),
+                  ),
+                ),
+              ),
               error: (e, _) => ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: kiamiScrollPadding(context, left: hPad, right: hPad),
@@ -379,40 +438,5 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
           ),
         );
     }
-  }
-}
-
-class _CategoryEmptyState extends StatelessWidget {
-  const _CategoryEmptyState({
-    required this.hasSearch,
-    required this.category,
-  });
-
-  final bool hasSearch;
-  final KiamiFileCategory category;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            category.icon,
-            size: 48,
-            color: category.accentColor.withValues(alpha: 0.85),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            hasSearch
-                ? KiamiStrings.categorySearchEmpty
-                : KiamiStrings.categoryFilesEmpty,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-        ],
-      ),
-    );
   }
 }

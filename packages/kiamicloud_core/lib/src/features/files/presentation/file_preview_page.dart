@@ -7,6 +7,9 @@ import 'package:video_player/video_player.dart';
 
 import '../../../api/models/kiami_file.dart';
 import '../../../constants/kiami_strings.dart';
+import '../../../theme/kiami_colors.dart';
+import '../../../theme/kiami_decorations.dart';
+import '../../../theme/kiami_spacing.dart';
 import '../../../utils/docx_preview.dart';
 import '../../../utils/file_category.dart';
 import '../../../utils/media_preview.dart';
@@ -59,6 +62,18 @@ class FilePreviewPage extends StatelessWidget {
   }
 
   static FilePreviewKind kindFor(KiamiFile file) => _kindFor(file);
+
+  /// Carrossel horizontal só para imagens e vídeos.
+  static bool isVisualCarouselFile(KiamiFile file) {
+    if (!canPreview(file)) return false;
+    final k = kindFor(file);
+    return k == FilePreviewKind.image || k == FilePreviewKind.video;
+  }
+
+  static bool galleryUsesVisualCarousel(List<KiamiFile> files) {
+    if (files.isEmpty) return false;
+    return files.every(isVisualCarouselFile);
+  }
 
   static FilePreviewKind _kindFor(KiamiFile file) {
     if (canPreviewPdfFile(file.name, file.sizeBytes)) {
@@ -411,13 +426,6 @@ class _MediaBodyState extends State<_MediaBody> {
     super.dispose();
   }
 
-  String _fmt(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return h > 0 ? '$h:$m:$s' : '$m:$s';
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_failed) {
@@ -431,111 +439,258 @@ class _MediaBodyState extends State<_MediaBody> {
     final controller = _controller;
     if (!_ready || controller == null) {
       return widget.isAudio
-          ? const SizedBox.shrink()
-          : const ColoredBox(color: Colors.black);
+          ? _AudioLoadingPlaceholder(fileName: widget.fileName)
+          : const ColoredBox(
+              color: Colors.black,
+              child: Center(
+                child: CircularProgressIndicator(color: Colors.white70),
+              ),
+            );
     }
 
     final value = controller.value;
     final position = value.position;
     final duration = value.duration;
-    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Column(
-      children: [
-        Expanded(
-          child: widget.isAudio
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(36),
-                        decoration: BoxDecoration(
-                          color: scheme.primaryContainer,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.audiotrack_rounded,
-                          size: 72,
-                          color: scheme.onPrimaryContainer,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
-                        child: Text(
-                          widget.fileName,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                    ],
+    return Container(
+      color: isDark
+          ? KiamiColors.darkBackground
+          : KiamiColors.lightGray,
+      child: Column(
+        children: [
+          Expanded(
+            child: widget.isAudio
+                ? _AudioArtwork(fileName: widget.fileName)
+                : Center(
+                    child: AspectRatio(
+                      aspectRatio: value.aspectRatio > 0
+                          ? value.aspectRatio
+                          : 16 / 9,
+                      child: VideoPlayer(controller),
+                    ),
                   ),
-                )
-              : Center(
-                  child: AspectRatio(
-                    aspectRatio: value.aspectRatio > 0
-                        ? value.aspectRatio
-                        : 16 / 9,
-                    child: VideoPlayer(controller),
-                  ),
-                ),
-        ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Slider(
-                  value: duration.inMilliseconds > 0
-                      ? position.inMilliseconds
-                          .clamp(0, duration.inMilliseconds)
-                          .toDouble()
-                      : 0,
-                  max: duration.inMilliseconds > 0
-                      ? duration.inMilliseconds.toDouble()
-                      : 1,
-                  onChanged: duration.inMilliseconds > 0
-                      ? (v) => controller
-                          .seekTo(Duration(milliseconds: v.round()))
-                      : null,
-                ),
-                Row(
-                  children: [
-                    Text(
-                      _fmt(position),
-                      style: Theme.of(context).textTheme.labelMedium,
-                    ),
-                    const Spacer(),
-                    IconButton.filled(
-                      iconSize: 32,
-                      onPressed: () {
-                        value.isPlaying
-                            ? controller.pause()
-                            : controller.play();
-                      },
-                      icon: Icon(
-                        value.isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      _fmt(duration),
-                      style: Theme.of(context).textTheme.labelMedium,
-                    ),
-                  ],
+          ),
+          _MediaControlBar(
+            position: position,
+            duration: duration,
+            isPlaying: value.isPlaying,
+            isAudio: widget.isAudio,
+            onSeek: duration.inMilliseconds > 0
+                ? (v) =>
+                    controller.seekTo(Duration(milliseconds: v.round()))
+                : null,
+            onPlayPause: () {
+              value.isPlaying ? controller.pause() : controller.play();
+            },
+            onRewind: () {
+              final next = position - const Duration(seconds: 10);
+              controller.seekTo(
+                next < Duration.zero ? Duration.zero : next,
+              );
+            },
+            onForward: () {
+              final next = position + const Duration(seconds: 10);
+              controller.seekTo(
+                next > duration ? duration : next,
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AudioLoadingPlaceholder extends StatelessWidget {
+  const _AudioLoadingPlaceholder({required this.fileName});
+
+  final String fileName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 36,
+            height: 36,
+            child: CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+          const SizedBox(height: KiamiSpacing.md),
+          Text(
+            fileName,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AudioArtwork extends StatelessWidget {
+  const _AudioArtwork({required this.fileName});
+
+  final String fileName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 220,
+            height: 220,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(KiamiDecorations.radiusXl),
+              gradient: KiamiColors.brandGradient,
+              boxShadow: [
+                BoxShadow(
+                  color: KiamiColors.primaryBlue.withValues(alpha: 0.28),
+                  blurRadius: 32,
+                  offset: const Offset(0, 16),
                 ),
               ],
             ),
+            child: const Icon(
+              Icons.music_note_rounded,
+              size: 88,
+              color: Colors.white,
+            ),
           ),
+          const SizedBox(height: KiamiSpacing.lg),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: KiamiSpacing.xl),
+            child: Text(
+              fileName,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ),
+          const SizedBox(height: KiamiSpacing.sm),
+          Text(
+            KiamiStrings.categoryAudio,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: KiamiColors.textSecondary(context),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MediaControlBar extends StatelessWidget {
+  const _MediaControlBar({
+    required this.position,
+    required this.duration,
+    required this.isPlaying,
+    required this.isAudio,
+    required this.onPlayPause,
+    required this.onRewind,
+    required this.onForward,
+    this.onSeek,
+  });
+
+  final Duration position;
+  final Duration duration;
+  final bool isPlaying;
+  final bool isAudio;
+  final VoidCallback onPlayPause;
+  final VoidCallback onRewind;
+  final VoidCallback onForward;
+  final ValueChanged<double>? onSeek;
+
+  String _fmt(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        decoration: BoxDecoration(
+          color: isDark
+              ? KiamiColors.darkSurfaceElevated
+              : KiamiColors.lightSurface,
+          borderRadius: BorderRadius.circular(KiamiDecorations.radiusCard),
+          boxShadow: KiamiDecorations.cardShadowLight,
         ),
-      ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 4,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              ),
+              child: Slider(
+                value: duration.inMilliseconds > 0
+                    ? position.inMilliseconds
+                        .clamp(0, duration.inMilliseconds)
+                        .toDouble()
+                    : 0,
+                max: duration.inMilliseconds > 0
+                    ? duration.inMilliseconds.toDouble()
+                    : 1,
+                onChanged: onSeek,
+              ),
+            ),
+            Row(
+              children: [
+                Text(
+                  _fmt(position),
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: '-10s',
+                  onPressed: onRewind,
+                  icon: const Icon(Icons.replay_10_rounded),
+                ),
+                FilledButton(
+                  onPressed: onPlayPause,
+                  style: FilledButton.styleFrom(
+                    shape: const CircleBorder(),
+                    padding: const EdgeInsets.all(16),
+                  ),
+                  child: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    size: 32,
+                  ),
+                ),
+                IconButton(
+                  tooltip: '+10s',
+                  onPressed: onForward,
+                  icon: const Icon(Icons.forward_10_rounded),
+                ),
+                const Spacer(),
+                Text(
+                  _fmt(duration),
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

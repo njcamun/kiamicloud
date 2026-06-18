@@ -4,10 +4,12 @@ import 'kiami_colors.dart';
 
 /// Sombras, gradientes e decoracao da identidade KiamiCloud.
 abstract final class KiamiDecorations {
-  static const double radiusSm = 10;
-  static const double radiusMd = 14;
-  static const double radiusLg = 18;
+  static const double radiusSm = 8;
+  static const double radiusMd = 12;
+  static const double radiusLg = 16;
+  static const double radiusCard = 20;
   static const double radiusXl = 24;
+  static const double radiusFull = 9999;
 
   static const EdgeInsets screenPadding =
       EdgeInsets.symmetric(horizontal: 28, vertical: 24);

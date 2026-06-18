@@ -45,6 +45,11 @@ abstract final class KiamiStrings {
   static const String dashboardGreeting = 'Olá';
   static const String dashboardTitle = 'Os meus ficheiros';
   static const String dashboardSearchHint = 'Pesquisar ficheiros…';
+  static const String dashboardRecent = 'Recentes';
+  static String categoryFileCount(int count) =>
+      count == 1 ? '1 ficheiro' : '$count ficheiros';
+  static const String audioFilterMusic = 'Música';
+  static const String audioFilterRecordings = 'Gravações';
   static const String filesCountOne = '1 ficheiro';
   static const String filesCountMany = 'ficheiros';
 
