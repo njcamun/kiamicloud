@@ -3,6 +3,7 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
 set "API_BETA_URL=https://kiamicloud-api-beta.kiamicloud.workers.dev"
+set "WEB_APP_URL=https://kiamicloud.web.app"
 set "GITHUB_ACTIONS_URL=https://github.com/njcamun/kiamicloud/actions"
 set "GITHUB_REPO_SUGERIDO=https://github.com/njcamun/kiamicloud.git"
 
@@ -36,9 +37,9 @@ echo.
 echo ============================================================
 echo   KiamiCloud — Publicacao completa
 echo ============================================================
-echo   GitHub ^(master^) -^> deploy web automatico ^(Firebase^)
-echo   [W] Publicar site — build + Firebase directo ^(recomendado^)
-echo   API beta -^> Cloudflare Workers + D1 + R2
+echo   Web App .......... %WEB_APP_URL%
+echo   GitHub ........... https://github.com/njcamun/kiamicloud
+echo   API beta ......... %API_BETA_URL%
 echo ============================================================
 echo.
 exit /b 0
