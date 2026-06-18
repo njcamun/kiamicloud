@@ -1,6 +1,6 @@
 # KiamiCloud — Monorepo Melos
 name: kiamicloud
-repository: https://github.com/kiamicloud/kiamicloud
+repository: https://github.com/njcamun/kiamicloud
 
 packages:
   - packages/**

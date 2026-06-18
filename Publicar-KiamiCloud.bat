@@ -15,6 +15,7 @@ call :SHOW_MENU
 set /p OPCAO=Escolha: 
 
 if /i "%OPCAO%"=="A" goto ASSISTENTE_INICIAL
+if /i "%OPCAO%"=="W" goto DEPLOY_WEB_FIREBASE
 if /i "%OPCAO%"=="B" goto MENU_GIT
 if /i "%OPCAO%"=="C" goto DEPLOY_API_BETA
 if /i "%OPCAO%"=="D" goto MIGRAR_D1
@@ -36,6 +37,7 @@ echo ============================================================
 echo   KiamiCloud — Publicacao completa
 echo ============================================================
 echo   GitHub ^(master^) -^> deploy web automatico ^(Firebase^)
+echo   [W] Publicar site — build + Firebase directo ^(recomendado^)
 echo   API beta -^> Cloudflare Workers + D1 + R2
 echo ============================================================
 echo.
@@ -71,14 +73,15 @@ exit /b 0
 echo O que pretende fazer?
 echo.
 echo   [A] Assistente inicial ^(primeira vez: Git + orientacao^)
-echo   [B] GitHub — commit / push
+echo   [W] Publicar site web ^(Firebase — build + deploy real^)
+echo   [B] GitHub — commit / push ^(opcional, para CI^)
 echo   [C] API — deploy beta ^(Workers + CORS R2^)
 echo   [D] API — aplicar migracoes D1 ^(remoto^)
 echo   [E] API — smoke test
 echo   [F] App — preparar dependencias ^(flutter pub get^)
 echo   [G] App — build APK mobile beta
-echo   [H] App — build web local ^(release^)
-echo   [I] Publicacao completa ^(assistente passo a passo^)
+echo   [H] App — build web local ^(sem deploy^)
+echo   [I] Publicacao completa ^(site + API + Git opcional^)
 echo   [J] Checklist e documentacao
 echo   [0] Sair
 echo.
@@ -317,10 +320,52 @@ if errorlevel 1 (
   echo [ERRO] git push falhou.
 ) else (
   echo [OK] Push concluido.
-  if /i "%BRANCH%"=="master" echo Deploy web: %GITHUB_ACTIONS_URL%
+  if /i "%BRANCH%"=="master" (
+    echo Nota: push so actualiza o site se GitHub Actions estiver configurado.
+    echo Para publicar ja: opcao [W] ou Publicar-Site-Web.bat
+    echo CI: %GITHUB_ACTIONS_URL%
+  )
 )
 pause
 goto MENU_GIT
+
+:DEPLOY_WEB_FIREBASE
+cls
+echo.
+echo === Publicar site web (Firebase Hosting) ===
+echo.
+echo Isto faz:
+echo   1. flutter pub get
+echo   2. flutter build web --release
+echo   3. firebase deploy --only hosting
+echo.
+echo URL: https://kiamicloud.web.app
+echo.
+if "%HAS_FLUTTER%"=="0" (
+  echo [ERRO] Flutter necessario.
+  pause
+  goto MAIN
+)
+if "%HAS_NODE%"=="0" (
+  echo [ERRO] Node.js necessario para firebase-tools.
+  pause
+  goto MAIN
+)
+set /p DW=Confirma publicacao do site? [S/N]: 
+if /i not "!DW!"=="S" goto MAIN
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\deploy-web-firebase.ps1"
+if errorlevel 1 (
+  echo.
+  echo [ERRO] Deploy web falhou.
+  echo Dica: npx firebase-tools login
+  pause
+  goto MAIN
+)
+echo.
+echo [OK] Site actualizado em https://kiamicloud.web.app
+pause
+goto MAIN
 
 :DEPLOY_API_BETA
 cls
@@ -519,7 +564,11 @@ if !WEB_ERR! neq 0 (
   echo [ERRO] Build web falhou.
 ) else (
   echo [OK] Build em apps\cloud\web\build\web\
-  echo Deploy manual: firebase deploy --only hosting
+  echo.
+  set /p DEPLOY=Publicar agora no Firebase? [S/N]: 
+  if /i "!DEPLOY!"=="S" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\deploy-web-firebase.ps1" -SkipBuild
+  )
 )
 pause
 goto MAIN
@@ -533,10 +582,10 @@ echo ============================================================
 echo.
 echo Passos recomendados para uma release:
 echo   1. Preparar dependencias
-echo   2. Commit + push GitHub ^(deploy web automatico^)
-echo   3. Migracoes D1 ^(se houver novas^)
-echo   4. Deploy API beta
-echo   5. Smoke test
+echo   2. Publicar site web ^(Firebase — build + deploy^)
+echo   3. Deploy API beta
+echo   4. Smoke test
+echo   5. Commit + push GitHub ^(opcional, backup/CI^)
 echo   6. Build mobile ^(opcional^)
 echo.
 
@@ -548,52 +597,54 @@ if /i "!P1!"=="S" (
   call :FLUTTER_PUB_GET "%~dp0apps\cloud\desktop"
 )
 
-call :DETECT_STATE
-
-if "%IS_REPO%"=="0" (
-  echo.
-  echo Git nao configurado — a abrir assistente inicial...
-  pause
-  goto ASSISTENTE_INICIAL
-)
-
-set /p P2=Passo 2 — commit + push GitHub? [S/N]: 
+set /p P2=Passo 2 — publicar site web no Firebase? [S/N]: 
 if /i "!P2!"=="S" (
-  if defined HAS_CHANGES (
-    call :EXEC_COMMIT
-  )
-  call :DETECT_STATE
-  for /f %%a in ('git rev-list --count origin/%BRANCH%..HEAD 2^>nul') do set AHEAD=%%a
-  if not defined AHEAD set AHEAD=0
-  if not "%AHEAD%"=="0" (
-    if /i not "%BRANCH%"=="master" git branch -M master 2>nul
-    git push -u origin master 2>nul
-    if errorlevel 1 git push -u origin %BRANCH%
-    if not errorlevel 1 echo [OK] Push GitHub — deploy web em %GITHUB_ACTIONS_URL%
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\deploy-web-firebase.ps1"
+  if errorlevel 1 (
+    echo [ERRO] Deploy web falhou.
+    pause
+    goto MAIN
   )
 )
 
-set /p P3=Passo 3 — migracoes D1 beta? [S/N]: 
-if /i "!P3!"=="S" (
-  if "%HAS_WORKERS_NM%"=="0" call :INSTALL_WORKERS
-  pushd "%~dp0workers"
-  call npx wrangler d1 migrations apply kiamicloud-db --remote --env beta
-  popd
+set /p P3=Passo 3 — deploy API beta? [S/N]: 
+if /i "!P3!"=="S" goto DEPLOY_API_BETA
+
+set /p P4=Passo 4 — smoke test? [S/N]: 
+if /i "!P4!"=="S" goto SMOKE_TEST
+
+call :DETECT_STATE
+set /p P5=Passo 5 — commit + push GitHub? [S/N]: 
+if /i "!P5!"=="S" (
+  if "%IS_REPO%"=="0" (
+    echo [AVISO] Git nao configurado — ignorado.
+  ) else (
+    if defined HAS_CHANGES call :EXEC_COMMIT
+    call :DETECT_STATE
+    for /f %%a in ('git rev-list --count origin/%BRANCH%..HEAD 2^>nul') do set AHEAD=%%a
+    if not defined AHEAD set AHEAD=0
+    if not "%AHEAD%"=="0" (
+      echo.
+      echo A enviar %AHEAD% commit^(s^) para origin/%BRANCH%...
+      git push -u origin %BRANCH%
+      if errorlevel 1 (
+        echo [ERRO] git push falhou.
+      ) else (
+        echo [OK] Codigo no GitHub. CI: %GITHUB_ACTIONS_URL%
+      )
+    ) else (
+      echo [AVISO] Nada para enviar ao GitHub.
+    )
+  )
 )
-
-set /p P4=Passo 4 — deploy API beta? [S/N]: 
-if /i "!P4!"=="S" goto DEPLOY_API_BETA
-
-set /p P5=Passo 5 — smoke test? [S/N]: 
-if /i "!P5!"=="S" goto SMOKE_TEST
 
 set /p P6=Passo 6 — build APK mobile? [S/N]: 
 if /i "!P6!"=="S" goto BUILD_MOBILE
 
 echo.
 echo === Publicacao concluida ===
-echo   Web: aguardar GitHub Actions
-echo   API: %API_BETA_URL%
+echo   Site: https://kiamicloud.web.app
+echo   API:  %API_BETA_URL%
 pause
 goto MAIN
 
@@ -614,11 +665,10 @@ echo   [ ] Opcao [C] — deploy API beta
 echo   [ ] Opcao [E] — smoke test
 echo.
 echo CADA RELEASE
-echo   [ ] Opcao [F] — dependencias actualizadas
-echo   [ ] Opcao [B] ou [I] — commit + push ^(deploy web^)
-echo   [ ] Opcao [D] — migracoes se houver novas
-echo   [ ] Opcao [C] — deploy API beta
+echo   [ ] Opcao [W] ou Publicar-Site-Web.bat — site no Firebase ^(OBRIGATORIO^)
+echo   [ ] Opcao [C] — deploy API beta ^(se mudou backend^)
 echo   [ ] Opcao [E] — validar API
+echo   [ ] Opcao [B] — commit + push GitHub ^(opcional^)
 echo   [ ] Opcao [G] — APK para testadores ^(opcional^)
 echo.
 echo DOCUMENTACAO
