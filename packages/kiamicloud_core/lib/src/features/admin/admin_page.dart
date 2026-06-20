@@ -11,55 +11,34 @@ import '../../api/models/kiami_admin.dart';
 import '../files/providers/files_providers.dart';
 import 'providers/admin_providers.dart';
 import 'widgets/admin_cloudflare_usage_section.dart';
+import 'widgets/admin_nav_card.dart';
 
-class AdminPage extends ConsumerStatefulWidget {
+class AdminPage extends ConsumerWidget {
   const AdminPage({super.key});
 
-  @override
-  ConsumerState<AdminPage> createState() => _AdminPageState();
-}
-
-class _AdminPageState extends ConsumerState<AdminPage> {
-  final _searchController = TextEditingController();
-  String? _search;
-  int _offset = 0;
-  static const _pageSize = 25;
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  AdminUsersQuery get _query => AdminUsersQuery(
-        search: _search,
-        limit: _pageSize,
-        offset: _offset,
-      );
-
-  void _refresh() {
+  void _refresh(WidgetRef ref) {
     ref.invalidate(adminDashboardProvider);
-    ref.invalidate(adminUsersProvider(_query));
+    ref.invalidate(adminStatsProvider);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(adminStatsProvider);
-    final usersAsync = ref.watch(adminUsersProvider(_query));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(KiamiStrings.adminTitle),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refresh,
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: () => _refresh(ref),
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () async => _refresh(),
+        onRefresh: () async => _refresh(ref),
         child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: kiamiScrollPadding(
             context,
             left: 16,
@@ -73,91 +52,49 @@ class _AdminPageState extends ConsumerState<AdminPage> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => _ErrorText(error: e),
             ),
-            const SizedBox(height: 8),
-            const AdminCloudflareUsageSection(),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => context.push(KiamiRoutes.adminSubscriptions),
-                icon: const Icon(Icons.subscriptions_outlined, size: 18),
-                label: const Text(KiamiStrings.adminViewSubscriptions),
-              ),
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: KiamiStrings.adminSearchHint,
-                prefixIcon: const Icon(Icons.search),
-                isDense: true,
-                suffixIcon: _search != null
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _search = null;
-                            _offset = 0;
-                          });
-                        },
-                      )
-                    : null,
-              ),
-              onSubmitted: (v) => setState(() {
-                _search = v.trim().isEmpty ? null : v.trim();
-                _offset = 0;
-              }),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             Text(
-              KiamiStrings.adminUsersTitle,
+              KiamiStrings.adminManageSection,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
             ),
-            const SizedBox(height: 8),
-            usersAsync.when(
-              data: (data) => Column(
+            const SizedBox(height: 10),
+            statsAsync.when(
+              data: (s) => Column(
                 children: [
-                  ...data.users.map((u) => _UserListTile(user: u)),
-                  if (data.total > _pageSize)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            onPressed: _offset > 0
-                                ? () => setState(
-                                      () => _offset = (_offset - _pageSize)
-                                          .clamp(0, 99999),
-                                    )
-                                : null,
-                            icon: const Icon(Icons.chevron_left),
-                          ),
-                          Text(
-                            '${_offset + 1}–${(_offset + data.users.length).clamp(0, data.total)} / ${data.total}',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          IconButton(
-                            onPressed: _offset + _pageSize < data.total
-                                ? () =>
-                                    setState(() => _offset += _pageSize)
-                                : null,
-                            icon: const Icon(Icons.chevron_right),
-                          ),
-                        ],
-                      ),
-                    ),
+                  AdminNavCard(
+                    icon: Icons.people_outline_rounded,
+                    title: KiamiStrings.adminManageUsers,
+                    subtitle: KiamiStrings.adminManageUsersHint,
+                    badge: '${s.usersCount}',
+                    onTap: () => context.push(KiamiRoutes.adminUsers),
+                  ),
+                  const SizedBox(height: 8),
+                  AdminNavCard(
+                    icon: Icons.payment_outlined,
+                    title: KiamiStrings.adminCheckoutsTitle,
+                    subtitle: KiamiStrings.adminViewPendingPayments,
+                    badge: s.pendingCheckoutsCount > 0
+                        ? '${s.pendingCheckoutsCount}'
+                        : null,
+                    highlight: s.pendingCheckoutsCount > 0,
+                    onTap: () => context.push(KiamiRoutes.adminCheckouts),
+                  ),
+                  const SizedBox(height: 8),
+                  AdminNavCard(
+                    icon: Icons.subscriptions_outlined,
+                    title: KiamiStrings.adminSubscriptionsTitle,
+                    subtitle: KiamiStrings.adminViewSubscriptions,
+                    onTap: () => context.push(KiamiRoutes.adminSubscriptions),
+                  ),
                 ],
               ),
-              loading: () => const Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => _ErrorText(error: e),
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
             ),
+            const SizedBox(height: 24),
+            const AdminCloudflareUsageSection(),
           ],
         ),
       ),
@@ -221,22 +158,11 @@ class _OverviewSection extends StatelessWidget {
                   label: KiamiStrings.adminStatPending,
                   value: '${stats.pendingCheckoutsCount}',
                   highlight: stats.pendingCheckoutsCount > 0,
-                  onTap: stats.pendingCheckoutsCount > 0
-                      ? () => context.push(KiamiRoutes.adminCheckouts)
-                      : null,
                 ),
               ),
             ],
           ),
         ),
-        if (stats.pendingCheckoutsCount > 0) ...[
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: () => context.push(KiamiRoutes.adminCheckouts),
-            icon: const Icon(Icons.arrow_forward, size: 18),
-            label: const Text(KiamiStrings.adminViewPendingPayments),
-          ),
-        ],
       ],
     );
   }
@@ -248,109 +174,42 @@ class _StatTile extends StatelessWidget {
     required this.label,
     required this.value,
     this.highlight = false,
-    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
   final bool highlight;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final child = Card(
+    return Card(
       elevation: highlight ? 1 : 0,
       color: highlight
           ? KiamiColors.primaryBlue.withValues(alpha: 0.08)
           : null,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 20, color: KiamiColors.primaryBlue),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              Text(
-                label,
-                maxLines: 2,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    return child;
-  }
-}
-
-class _UserListTile extends StatelessWidget {
-  const _UserListTile({required this.user});
-
-  final KiamiAdminUser user;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = user.displayName ?? user.email ?? user.uid;
-    final subtitle = user.displayName != null && user.email != null
-        ? user.email!
-        : null;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 6),
-      color: user.hasPendingNotifications
-          ? KiamiColors.primaryBlue.withValues(alpha: 0.06)
-          : null,
-      child: ListTile(
-        leading: user.hasPendingNotifications
-            ? Badge(
-                label: Text('${user.pendingNotificationsCount}'),
-                child: Icon(
-                  user.hasPendingCheckouts
-                      ? Icons.payment_outlined
-                      : Icons.support_agent_outlined,
-                ),
-              )
-            : null,
-        title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Column(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (subtitle != null)
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+            Icon(icon, size: 20, color: KiamiColors.primaryBlue),
+            const SizedBox(height: 8),
             Text(
-              '${formatBytes(user.storageUsedBytes)} / ${formatBytes(user.quotaBytes)}',
-              style: Theme.of(context).textTheme.bodySmall,
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
-            const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(
-                value: user.storageUsageFraction,
-                minHeight: 4,
-              ),
+            Text(
+              label,
+              maxLines: 2,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
-        isThreeLine: true,
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push(KiamiRoutes.adminUserFor(user.uid)),
       ),
     );
   }

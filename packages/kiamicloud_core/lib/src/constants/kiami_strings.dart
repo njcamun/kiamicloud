@@ -441,6 +441,13 @@ abstract final class KiamiStrings {
   static const String adminTitle = 'Administração';
   static const String adminSearchHint = 'Pesquisar por email, nome ou UID…';
   static const String adminUsersTitle = 'Utilizadores';
+  static const String adminUsersEmpty = 'Nenhum utilizador encontrado.';
+  static const String adminUserSingular = 'utilizador';
+  static const String adminManageSection = 'Gestão';
+  static const String adminManageUsers = 'Gerir utilizadores';
+  static const String adminManageUsersHint =
+      'Listar, pesquisar e ajustar planos';
+  static const String adminMemberSince = 'desde';
   static const String adminSecurityTitle = 'Eventos de segurança';
   static const String adminEditUser = 'Editar utilizador';
   static const String adminPlanLabel = 'Plano';

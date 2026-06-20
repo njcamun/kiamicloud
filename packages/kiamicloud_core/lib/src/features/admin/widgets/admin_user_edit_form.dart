@@ -163,66 +163,36 @@ class _AdminUserEditFormState extends ConsumerState<AdminUserEditForm> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final used = widget.user.storageUsedBytes;
-    final capacity = _limitsEnforced
-        ? (_customStorage ? _storageBytes : _planQuotaBytes)
-        : null;
-    final usageRatio = capacity != null && capacity > 0
-        ? (used / capacity).clamp(0.0, 1.0)
-        : 0.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DropdownButtonFormField<String>(
-          initialValue: _selectedPlan,
-          decoration: const InputDecoration(
-            labelText: KiamiStrings.adminPlanLabel,
-          ),
-          items: widget.plans
-              .map(
-                (p) => DropdownMenuItem(value: p.code, child: Text(p.name)),
-              )
-              .toList(),
-          onChanged: (v) {
-            if (v == null) return;
-            setState(() {
-              _selectedPlan = v;
-              if (!_customStorage) _storageBytes = _planQuotaBytes;
-              if (!_customTransfer) _transferBytes = _planTransferBytes;
-            });
-          },
-        ),
-        const SizedBox(height: 20),
         Text(
-          KiamiStrings.adminStorageSection,
-          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        _InfoRow(
-          label: KiamiStrings.adminStorageInUse,
-          value: _limitsEnforced
-              ? '${formatBytes(used)} / ${formatBytes(capacity!)}'
-              : '${formatBytes(used)} · ${KiamiStrings.noTransferLimit}',
-        ),
-        if (_limitsEnforced) ...[
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: usageRatio,
-              minHeight: 8,
-            ),
-          ),
-        ],
-        const SizedBox(height: 6),
-        Text(
-          '${widget.user.filesCount} ${KiamiStrings.adminUserFiles.toLowerCase()}',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          KiamiStrings.adminPlanLabel,
+          style: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: widget.plans.map((p) {
+            final selected = _selectedPlan == p.code;
+            return ChoiceChip(
+              label: Text(p.name),
+              selected: selected,
+              onSelected: (_) {
+                setState(() {
+                  _selectedPlan = p.code;
+                  if (!_customStorage) _storageBytes = _planQuotaBytes;
+                  if (!_customTransfer) _transferBytes = _planTransferBytes;
+                });
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 16),
         if (!_limitsEnforced)
           Text(
             KiamiStrings.adminLocalUnlimitedHint,
@@ -230,152 +200,139 @@ class _AdminUserEditFormState extends ConsumerState<AdminUserEditForm> {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           )
-        else ...[
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text(KiamiStrings.adminStorageCustom),
+        else
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(
+              KiamiStrings.adminStorageCustom,
+              style: theme.textTheme.titleSmall,
+            ),
             subtitle: Text(
               _customStorage
                   ? formatBytes(_storageBytes)
-                  : '${KiamiStrings.adminStoragePlanDefault}: ${formatBytes(_planQuotaBytes)}',
+                  : formatBytes(_planQuotaBytes),
+              style: theme.textTheme.bodySmall,
             ),
-            value: _customStorage,
-            onChanged: (v) {
-              setState(() {
-                _customStorage = v;
-                if (v) {
-                  _storageBytes = widget.user.hasQuotaOverride
-                      ? widget.user.quotaOverrideBytes!
-                      : widget.user.quotaBytes;
-                }
-              });
-            },
-          ),
-          if (_customStorage) ...[
-            const SizedBox(height: 8),
-            Builder(
-              builder: (context) {
-                const maxGb = 500;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      children: [20, 40, 80, 150, 320, 500].map((gb) {
-                        final bytes = gb * _gb;
-                        return FilterChip(
-                          label: Text('$gb GB'),
-                          selected: _storageBytes == bytes,
-                          onSelected: (_) =>
-                              setState(() => _storageBytes = bytes),
-                        );
-                      }).toList(),
-                    ),
-                    Slider(
-                      value: (_storageBytes / _gb)
-                          .clamp(5, maxGb.toDouble())
-                          .toDouble(),
-                      min: 5,
-                      max: maxGb.toDouble(),
-                      divisions: maxGb - 5,
-                      label: formatBytes(_storageBytes),
-                      onChanged: (v) =>
-                          setState(() => _storageBytes = v.round() * _gb),
-                    ),
-                    Center(
-                      child: Text(
-                        formatBytes(_storageBytes),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ] else ...[
-            const SizedBox(height: 6),
-            _InfoRow(
-              label: KiamiStrings.adminStorageCapacity,
-              value: formatBytes(_planQuotaBytes),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              KiamiStrings.adminStorageReadOnlyHint,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            initiallyExpanded: _customStorage,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(KiamiStrings.adminStorageCustom),
+                value: _customStorage,
+                onChanged: (v) {
+                  setState(() {
+                    _customStorage = v;
+                    if (v) {
+                      _storageBytes = widget.user.hasQuotaOverride
+                          ? widget.user.quotaOverrideBytes!
+                          : widget.user.quotaBytes;
+                    }
+                  });
+                },
               ),
-            ),
-          ],
-        ],
-        if (_limitsEnforced) ...[
-          const SizedBox(height: 20),
-          Text(
-            KiamiStrings.adminTransferSection,
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w600),
+              if (_customStorage) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [20, 40, 80, 150, 320, 500].map((gb) {
+                    final bytes = gb * _gb;
+                    return FilterChip(
+                      label: Text('$gb GB'),
+                      selected: _storageBytes == bytes,
+                      onSelected: (_) =>
+                          setState(() => _storageBytes = bytes),
+                    );
+                  }).toList(),
+                ),
+                Slider(
+                  value: (_storageBytes / _gb).clamp(5, 500).toDouble(),
+                  min: 5,
+                  max: 500,
+                  divisions: 495,
+                  label: formatBytes(_storageBytes),
+                  onChanged: (v) =>
+                      setState(() => _storageBytes = v.round() * _gb),
+                ),
+                Center(
+                  child: Text(
+                    formatBytes(_storageBytes),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
+        if (_limitsEnforced) ...[
           const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text(KiamiStrings.adminTransferCustom),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(
+              KiamiStrings.adminTransferSection,
+              style: theme.textTheme.titleSmall,
+            ),
             subtitle: Text(
               _customTransfer
                   ? formatBytes(_transferBytes)
-                  : '${KiamiStrings.adminTransferPlanDefault}: ${formatBytes(_planTransferBytes)}',
+                  : formatBytes(_planTransferBytes),
+              style: theme.textTheme.bodySmall,
             ),
-            value: _customTransfer,
-            onChanged: (v) {
-              setState(() {
-                _customTransfer = v;
-                if (v) {
-                  _transferBytes = widget.user.hasTransferOverride
-                      ? widget.user.transferOverrideBytes!
-                      : widget.user.maxFileSizeBytes;
-                }
-              });
-            },
-          ),
-          if (_customTransfer) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: _transferPresetsMb.map((mb) {
-                final bytes = mb * _mb;
-                return FilterChip(
-                  label: Text('$mb MB'),
-                  selected: _transferBytes == bytes,
-                  onSelected: (_) => setState(() => _transferBytes = bytes),
-                );
-              }).toList(),
-            ),
-            Slider(
-              value: (_transferBytes / _mb)
-                  .clamp(5, _transferMaxMb.toDouble())
-                  .toDouble(),
-              min: 5,
-              max: _transferMaxMb.toDouble(),
-              divisions: 59,
-              label: formatBytes(_transferBytes),
-              onChanged: (v) => setState(() => _transferBytes = v.round() * _mb),
-            ),
-            Center(
-              child: Text(
-                formatBytes(_transferBytes),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            initiallyExpanded: _customTransfer,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(KiamiStrings.adminTransferCustom),
+                value: _customTransfer,
+                onChanged: (v) {
+                  setState(() {
+                    _customTransfer = v;
+                    if (v) {
+                      _transferBytes = widget.user.hasTransferOverride
+                          ? widget.user.transferOverrideBytes!
+                          : widget.user.maxFileSizeBytes;
+                    }
+                  });
+                },
               ),
-            ),
-          ],
+              if (_customTransfer) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: _transferPresetsMb.map((mb) {
+                    final bytes = mb * _mb;
+                    return FilterChip(
+                      label: Text('$mb MB'),
+                      selected: _transferBytes == bytes,
+                      onSelected: (_) =>
+                          setState(() => _transferBytes = bytes),
+                    );
+                  }).toList(),
+                ),
+                Slider(
+                  value: (_transferBytes / _mb)
+                      .clamp(5, _transferMaxMb.toDouble())
+                      .toDouble(),
+                  min: 5,
+                  max: _transferMaxMb.toDouble(),
+                  divisions: 59,
+                  label: formatBytes(_transferBytes),
+                  onChanged: (v) =>
+                      setState(() => _transferBytes = v.round() * _mb),
+                ),
+                Center(
+                  child: Text(
+                    formatBytes(_transferBytes),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
-        const SizedBox(height: 20),
-        Text(
-          KiamiStrings.settingsServerTitle,
-          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text(KiamiStrings.adminCanSwitchServer),
@@ -383,7 +340,7 @@ class _AdminUserEditFormState extends ConsumerState<AdminUserEditForm> {
           value: _canSwitchApiEndpoint,
           onChanged: (v) => setState(() => _canSwitchApiEndpoint = v),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         FilledButton(
           onPressed: !_hasChanges || _saving ? null : _save,
           child: _saving
@@ -394,23 +351,6 @@ class _AdminUserEditFormState extends ConsumerState<AdminUserEditForm> {
                 )
               : const Text(KiamiStrings.adminSave),
         ),
-      ],
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Text(label)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
       ],
     );
   }

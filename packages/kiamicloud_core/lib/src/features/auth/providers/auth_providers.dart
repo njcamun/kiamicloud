@@ -19,6 +19,7 @@ import '../../trash/trash_page.dart';
 import '../../admin/admin_page.dart';
 import '../../admin/admin_checkouts_page.dart';
 import '../../admin/admin_subscriptions_page.dart';
+import '../../admin/admin_users_page.dart';
 import '../../admin/admin_user_detail_page.dart';
 import '../../legal/legal_acceptance_page.dart';
 import '../../shell/app_shell.dart';
@@ -150,10 +151,16 @@ final kiamiRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const AdminSubscriptionsPage(),
               ),
               GoRoute(
-                path: 'users/:uid',
-                builder: (context, state) => AdminUserDetailPage(
-                  uid: state.pathParameters['uid']!,
-                ),
+                path: 'users',
+                builder: (context, state) => const AdminUsersPage(),
+                routes: [
+                  GoRoute(
+                    path: ':uid',
+                    builder: (context, state) => AdminUserDetailPage(
+                      uid: state.pathParameters['uid']!,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

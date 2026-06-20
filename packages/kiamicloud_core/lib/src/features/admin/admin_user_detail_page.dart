@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../constants/kiami_strings.dart';
+import '../../theme/kiami_colors.dart';
+import '../../theme/kiami_decorations.dart';
+import '../../utils/format_bytes.dart';
+import '../../utils/format_date.dart';
 import '../../utils/kiami_layout.dart';
+import '../../widgets/kiami_card.dart';
 import '../auth/providers/auth_providers.dart';
 import '../billing/providers/billing_providers.dart';
 import '../files/providers/files_providers.dart';
@@ -22,13 +27,7 @@ class AdminUserDetailPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: userAsync.when(
-          data: (user) => Text(
-            user.displayName ?? user.email ?? KiamiStrings.adminUserDetailTitle,
-          ),
-          loading: () => const Text(KiamiStrings.adminUserDetailTitle),
-          error: (_, __) => const Text(KiamiStrings.adminUserDetailTitle),
-        ),
+        title: const Text(KiamiStrings.adminUserDetailTitle),
       ),
       body: userAsync.when(
         data: (user) {
@@ -36,34 +35,144 @@ class AdminUserDetailPage extends ConsumerWidget {
           if (plans.isEmpty && plansAsync.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
+
+          final name = user.displayName ?? user.email ?? user.uid;
+          final initial =
+              name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
+
           return ListView(
-            padding: kiamiScrollPadding(context, left: 16, top: 16, right: 16),
+            padding: kiamiScrollPadding(
+              context,
+              left: 16,
+              top: 16,
+              right: 16,
+              bottomExtra: 28,
+            ),
             children: [
-              if (user.email != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    user.email!,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+              KiamiCard(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 32,
+                      backgroundColor:
+                          KiamiColors.primaryBlue.withValues(alpha: 0.12),
+                      foregroundColor: KiamiColors.primaryBlue,
+                      child: Text(
+                        initial,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      style:
+                          Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                    ),
+                    if (user.email != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        user.email!,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: KiamiColors.primaryBlue.withValues(alpha: 0.1),
+                        borderRadius:
+                            BorderRadius.circular(KiamiDecorations.radiusMd),
+                      ),
+                      child: Text(
+                        user.planName,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: KiamiColors.primaryBlue,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          KiamiStrings.adminStorageInUse,
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
-                  ),
+                        Text(
+                          '${formatBytes(user.storageUsedBytes)} / ${formatBytes(user.quotaBytes)}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: user.storageUsageFraction,
+                        minHeight: 6,
+                        backgroundColor:
+                            KiamiColors.primaryBlue.withValues(alpha: 0.12),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '${user.filesCount} ${KiamiStrings.adminUserFiles.toLowerCase()} · ${KiamiStrings.adminMemberSince} ${formatFileDate(user.createdAt)}',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                    ),
+                  ],
                 ),
-              AdminUserNotificationsSection(uid: uid),
-              AdminUserEditForm(
-                user: user,
-                plans: plans,
-                onSaved: (updated) {
-                  ref.invalidate(adminUserDetailProvider(uid));
-                  ref.invalidate(adminUsersProvider);
-                  ref.invalidate(adminStatsProvider);
-                  final currentUid =
-                      ref.read(authStateProvider).valueOrNull?.uid;
-                  if (currentUid != null && currentUid == updated.uid) {
-                    refreshKiamiProfile(ref);
-                    ref.invalidate(billingStatusProvider);
-                  }
-                },
+              ),
+              if (user.hasPendingNotifications) ...[
+                const SizedBox(height: 16),
+                AdminUserNotificationsSection(uid: uid),
+              ],
+              const SizedBox(height: 16),
+              Text(
+                KiamiStrings.adminEditUser,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              KiamiCard(
+                padding: const EdgeInsets.all(16),
+                child: AdminUserEditForm(
+                  user: user,
+                  plans: plans,
+                  onSaved: (updated) {
+                    ref.invalidate(adminUserDetailProvider(uid));
+                    ref.invalidate(adminUsersProvider);
+                    ref.invalidate(adminStatsProvider);
+                    final currentUid =
+                        ref.read(authStateProvider).valueOrNull?.uid;
+                    if (currentUid != null && currentUid == updated.uid) {
+                      refreshKiamiProfile(ref);
+                      ref.invalidate(billingStatusProvider);
+                    }
+                  },
+                ),
               ),
             ],
           );
