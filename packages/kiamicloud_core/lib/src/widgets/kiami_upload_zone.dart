@@ -308,3 +308,61 @@ class _KiamiUploadZoneState extends State<KiamiUploadZone> {
     );
   }
 }
+
+/// Mesmas dimensões do [KiamiUploadZone], com ilustração no lugar do conteúdo.
+class KiamiUploadIllustrationCard extends StatelessWidget {
+  const KiamiUploadIllustrationCard({
+    super.key,
+    required this.child,
+    this.cardWidth,
+  });
+
+  final Widget child;
+  final double? cardWidth;
+
+  double _widthFraction(double screenWidth) {
+    if (screenWidth < 340) return 0.94;
+    if (screenWidth < 400) return 0.92;
+    return KiamiUploadZone.cardWidthFraction;
+  }
+
+  double _resolveCardWidth(double screenWidth, double maxWidth) {
+    final target = cardWidth ?? screenWidth * _widthFraction(screenWidth);
+    if (maxWidth.isFinite && maxWidth > 0) {
+      return math.min(target, maxWidth);
+    }
+    return target;
+  }
+
+  double _resolveCardHeight(double cardWidth, double screenHeight) {
+    final byWidth = cardWidth * 0.28;
+    final byScreen = screenHeight * 0.11;
+    final h = math.min(byWidth, math.max(byScreen, KiamiUploadZone.minCardHeight));
+    return h.clamp(KiamiUploadZone.minCardHeight, KiamiUploadZone.maxCardHeight);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.sizeOf(context);
+
+    return LayoutBuilder(
+      builder: (context, outer) {
+        final resolvedWidth = _resolveCardWidth(screenSize.width, outer.maxWidth);
+        final cardHeight = _resolveCardHeight(resolvedWidth, screenSize.height);
+
+        return Align(
+          alignment:
+              cardWidth != null ? Alignment.centerLeft : Alignment.center,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(KiamiDecorations.radiusLg),
+            child: SizedBox(
+              width: resolvedWidth,
+              height: cardHeight,
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

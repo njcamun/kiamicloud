@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../api/models/kiami_account_event.dart';
 import '../../../constants/kiami_strings.dart';
 import '../../../routing/kiami_routes.dart';
+import '../../../widgets/kiami_unavailable.dart';
 import '../../files/providers/files_providers.dart';
 import '../providers/account_activity_providers.dart';
 import 'account_event_tile.dart';
@@ -131,7 +132,9 @@ class _AccountNotificationsPanelState
       data: (activity) =>
           _buildList(context, planNotificationEvents(activity.events)),
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Text(kiamiApiErrorMessage(e)),
+      error: (e, _) => kiamiApiErrorIsConnection(e)
+          ? const KiamiNoConnectCard(compact: true)
+          : const KiamiUnavailableCard(compact: true),
     );
   }
 

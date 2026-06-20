@@ -28,7 +28,20 @@ Future<bool> launchSupportEmail({
 }
 
 /// Diálogo: WhatsApp ou e-mail.
-Future<void> showSupportContactDialog(BuildContext context) {
+Future<void> showSupportContactDialog(
+  BuildContext context, {
+  String? title,
+  String? body,
+  String? whatsAppMessage,
+  String? emailSubject,
+  String? emailBody,
+}) {
+  final dialogTitle = title ?? KiamiStrings.supportContactTitle;
+  final dialogBody = body ?? KiamiStrings.supportContactBody;
+  final waMessage = whatsAppMessage ?? KiamiStrings.supportWhatsAppDefaultMessage;
+  final mailSubject = emailSubject ?? KiamiStrings.supportEmailSubject;
+  final mailBody = emailBody ?? waMessage;
+
   return showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -39,11 +52,11 @@ Future<void> showSupportContactDialog(BuildContext context) {
             color: Theme.of(ctx).colorScheme.primary,
           ),
           const SizedBox(width: 10),
-          const Expanded(child: Text(KiamiStrings.supportContactTitle)),
+          Expanded(child: Text(dialogTitle)),
         ],
       ),
       content: Text(
-        KiamiStrings.supportContactBody,
+        dialogBody,
         style: Theme.of(ctx).textTheme.bodyMedium,
       ),
       actions: [
@@ -63,7 +76,7 @@ Future<void> showSupportContactDialog(BuildContext context) {
               );
               return;
             }
-            final ok = await launchSupportWhatsApp();
+            final ok = await launchSupportWhatsApp(message: waMessage);
             if (!ok && context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -79,8 +92,8 @@ Future<void> showSupportContactDialog(BuildContext context) {
           onPressed: () async {
             Navigator.pop(ctx);
             final ok = await launchSupportEmail(
-              subject: KiamiStrings.supportEmailSubject,
-              body: KiamiStrings.supportWhatsAppDefaultMessage,
+              subject: mailSubject,
+              body: mailBody,
             );
             if (!ok && context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -95,5 +108,17 @@ Future<void> showSupportContactDialog(BuildContext context) {
         ),
       ],
     ),
+  );
+}
+
+/// Plano / subscrição — actualização manual via suporte.
+Future<void> showPlanChangeSupportDialog(BuildContext context) {
+  return showSupportContactDialog(
+    context,
+    title: KiamiStrings.planChangeSupportTitle,
+    body: KiamiStrings.planChangeSupportBody,
+    whatsAppMessage: KiamiStrings.planChangeSupportWhatsAppMessage,
+    emailSubject: KiamiStrings.planChangeSupportEmailSubject,
+    emailBody: KiamiStrings.planChangeSupportWhatsAppMessage,
   );
 }

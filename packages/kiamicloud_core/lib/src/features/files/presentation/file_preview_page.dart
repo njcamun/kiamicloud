@@ -12,6 +12,7 @@ import '../../../constants/kiami_strings.dart';
 import '../../../theme/kiami_colors.dart';
 import '../../../theme/kiami_decorations.dart';
 import '../../../theme/kiami_spacing.dart';
+import '../../../widgets/kiami_unavailable.dart';
 import '../../../utils/docx_preview.dart';
 import '../../../utils/file_category.dart';
 import '../../../utils/media_preview.dart';
@@ -182,15 +183,27 @@ class FilePreviewPage extends StatelessWidget {
     if (isMedia && loadMediaSource == null) return;
 
     if (!context.mounted) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => _FilePreviewLoader(
-          file: file,
-          kind: kind,
-          loadBytes: isMedia ? null : loadBytes,
-          loadMediaSource: isMedia ? loadMediaSource : null,
-        ),
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.42),
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, __, ___) => _FilePreviewLoader(
+        file: file,
+        kind: kind,
+        loadBytes: isMedia ? null : loadBytes,
+        loadMediaSource: isMedia ? loadMediaSource : null,
       ),
+      transitionBuilder: (_, animation, __, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          ),
+          child: child,
+        );
+      },
     );
   }
 }
@@ -217,6 +230,7 @@ class _FilePreviewLoaderState extends State<_FilePreviewLoader> {
   Uint8List? _bytes;
   MediaSource? _mediaSource;
   String? _error;
+  bool _connectionError = false;
 
   @override
   void initState() {
@@ -225,14 +239,23 @@ class _FilePreviewLoaderState extends State<_FilePreviewLoader> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _error = null;
+      _connectionError = false;
+      _bytes = null;
+      _mediaSource = null;
+    });
     try {
       if (FilePreviewPage.isMediaKind(widget.kind)) {
         _mediaSource = await widget.loadMediaSource!();
       } else {
         _bytes = await widget.loadBytes!();
       }
-    } catch (_) {
-      _error = KiamiStrings.previewLoadError;
+    } catch (e) {
+      _connectionError = kiamiPreviewConnectionIssue(e);
+      _error = _connectionError
+          ? KiamiStrings.noConnectTitle
+          : KiamiStrings.previewLoadError;
     }
     if (mounted) setState(() {});
   }
@@ -240,18 +263,9 @@ class _FilePreviewLoaderState extends State<_FilePreviewLoader> {
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(
-            widget.file.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        body: _PreviewMessage(
-          icon: Icons.error_outline_rounded,
-          message: _error!,
-        ),
+      return KiamiPreviewIssueOverlay(
+        connectionError: _connectionError,
+        onDismiss: () => Navigator.of(context).pop(),
       );
     }
 
@@ -572,9 +586,11 @@ class _DocxBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = extractDocxText(bytes);
     if (text == null) {
-      return const _PreviewMessage(
-        icon: Icons.description_outlined,
-        message: KiamiStrings.previewDocxError,
+      return const SizedBox.expand(
+        child: KiamiPreviewIssueOverlay(
+          connectionError: false,
+          barrierDismissible: false,
+        ),
       );
     }
     return Scrollbar(
@@ -661,6 +677,14 @@ class _MediaBodyState extends State<_MediaBody> {
   }
 
   Future<void> _init() async {
+    _controller?.removeListener(_onTick);
+    await _controller?.dispose();
+    _controller = null;
+    if (!mounted) return;
+    setState(() {
+      _failed = false;
+      _ready = false;
+    });
     try {
       final controller = VideoPlayerController.networkUrl(
         Uri.parse(widget.source.url),
@@ -713,11 +737,11 @@ class _MediaBodyState extends State<_MediaBody> {
   @override
   Widget build(BuildContext context) {
     if (_failed) {
-      return _PreviewMessage(
-        icon: widget.isAudio
-            ? Icons.audiotrack_outlined
-            : Icons.movie_outlined,
-        message: KiamiStrings.previewMediaError,
+      return const SizedBox.expand(
+        child: KiamiPreviewIssueOverlay(
+          connectionError: false,
+          barrierDismissible: false,
+        ),
       );
     }
     final controller = _controller;
@@ -1270,40 +1294,5 @@ class _AudioLoadingPlaceholder extends StatelessWidget {
     }
 
     return Center(child: body);
-  }
-}
-
-class _PreviewMessage extends StatelessWidget {
-  const _PreviewMessage({required this.icon, required this.message});
-
-  final IconData icon;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 56,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.4,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

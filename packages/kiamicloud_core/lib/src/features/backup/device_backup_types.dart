@@ -19,7 +19,8 @@ class DeviceBackupProgress {
 
 typedef DeviceBackupUpload = Future<void> Function(
   String fileName,
-  List<int> bytes,
+  Object file,
+  String mimeType,
 );
 
 /// Resultado do restore.

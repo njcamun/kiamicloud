@@ -464,6 +464,34 @@ export async function listSubscriptionsAdmin(
   return { items, total: countRow?.c ?? 0 };
 }
 
+export async function getSubscriptionAdminForUser(
+  db: D1Database,
+  firebaseUid: string,
+): Promise<AdminSubscriptionDto | null> {
+  const row = await getLatestSubscriptionRow(db, firebaseUid);
+  if (!row) return null;
+
+  const user = await db
+    .prepare(
+      `SELECT email, display_name, storage_used_bytes
+       FROM users WHERE firebase_uid = ?`,
+    )
+    .bind(firebaseUid)
+    .first<{
+      email: string | null;
+      display_name: string | null;
+      storage_used_bytes: number;
+    }>();
+
+  return {
+    ...mapSubscription(row),
+    firebaseUid,
+    email: user?.email ?? null,
+    displayName: user?.display_name ?? null,
+    storageUsedBytes: user?.storage_used_bytes ?? 0,
+  };
+}
+
 export async function reactivateSubscriptionAdmin(
   db: D1Database,
   input: {

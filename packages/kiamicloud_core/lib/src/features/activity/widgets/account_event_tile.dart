@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../api/models/kiami_account_event.dart';
 import '../../../constants/kiami_strings.dart';
 import '../../../theme/kiami_colors.dart';
+import '../../../utils/format_date.dart';
 
 class AccountEventTile extends StatelessWidget {
   const AccountEventTile({
@@ -69,8 +70,10 @@ class AccountEventTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = _accentColor(context);
     final scheme = Theme.of(context).colorScheme;
+    final whenLabel = formatNotificationWhen(event.createdAt);
 
     return Card(
+      margin: EdgeInsets.zero,
       color: event.isUnread
           ? KiamiColors.primaryBlue.withValues(alpha: 0.06)
           : accent?.withValues(alpha: 0.05),
@@ -84,10 +87,10 @@ class AccountEventTile extends StatelessWidget {
               children: [
                 Icon(
                   _icon,
-                  size: 18,
+                  size: 20,
                   color: accent ?? scheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,27 +101,58 @@ class AccountEventTile extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                       ),
+                      const SizedBox(height: 4),
                       Text(
                         event.kindLabel,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: accent ?? scheme.primary,
+                              fontWeight: FontWeight.w500,
                             ),
                       ),
                     ],
                   ),
                 ),
+                if (event.isUnread)
+                  Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(top: 4, left: 6),
+                    decoration: const BoxDecoration(
+                      color: KiamiColors.primaryBlue,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+              ],
+            ),
+            if (event.body.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                event.body.trim(),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(
+                  Icons.schedule_rounded,
+                  size: 14,
+                  color: scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
                 Text(
-                  _formatWhen(event.createdAt),
+                  whenLabel,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(event.body),
             if (_showAdminSubscriptionControl) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
@@ -143,15 +177,4 @@ class AccountEventTile extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatWhen(String iso) {
-  final dt = DateTime.tryParse(iso);
-  if (dt == null) return iso.length > 16 ? iso.substring(0, 16) : iso;
-  final local = dt.toLocal();
-  final d = local.day.toString().padLeft(2, '0');
-  final m = local.month.toString().padLeft(2, '0');
-  final h = local.hour.toString().padLeft(2, '0');
-  final min = local.minute.toString().padLeft(2, '0');
-  return '$d/$m ${local.year} $h:$min';
 }

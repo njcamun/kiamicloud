@@ -51,10 +51,6 @@ class _AccountActivitySheetState extends ConsumerState<AccountActivitySheet> {
               ),
             ],
           ),
-          Text(
-            KiamiStrings.notificationsHint,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
           const SizedBox(height: 12),
           const Flexible(
             child: AccountNotificationsPanel(),

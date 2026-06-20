@@ -19,6 +19,7 @@ import {
 } from '../db/support_chat';
 import {
   adjustSubscriptionEndsAtAdmin,
+  getSubscriptionAdminForUser,
   listSubscriptionsAdmin,
   reactivateSubscriptionAdmin,
 } from '../db/subscriptions';
@@ -162,6 +163,13 @@ adminRoutes.post('/users/:uid/support/messages', requireCloudSupportChat, async 
 adminRoutes.post('/users/:uid/support/read', requireCloudSupportChat, async (c) => {
   await markSupportReadByAdmin(c.env.DB, c.req.param('uid'));
   return c.json({ ok: true });
+});
+
+/** Subscrição de um utilizador. */
+adminRoutes.get('/users/:uid/subscription', async (c) => {
+  const uid = c.req.param('uid');
+  const subscription = await getSubscriptionAdminForUser(c.env.DB, uid);
+  return c.json({ subscription });
 });
 
 /** Detalhe de um utilizador. */
@@ -391,6 +399,13 @@ adminRoutes.post('/feedback/:id/review', async (c) => {
     feedback: result.feedback,
     message: 'Feedback marcado como tratado.',
   });
+});
+
+/** Subscrição de um utilizador. */
+adminRoutes.get('/subscriptions/:uid', async (c) => {
+  const uid = c.req.param('uid');
+  const subscription = await getSubscriptionAdminForUser(c.env.DB, uid);
+  return c.json({ subscription });
 });
 
 /** Lista subscrições (filtro por estado). */

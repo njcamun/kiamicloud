@@ -6,6 +6,19 @@ import 'package:http/http.dart' as http;
 
 import 'upload_put_response.dart';
 
+Future<UploadPutResponse> putUploadFile({
+  http.Client? client,
+  required String url,
+  required String filePath,
+  required int totalBytes,
+  required String contentType,
+  required Map<String, String> headers,
+  UploadProgressCallback? onProgress,
+  Duration? timeout,
+}) {
+  throw UnsupportedError('putUploadFile is not supported on web.');
+}
+
 Future<UploadPutResponse> putUploadBytes({
   http.Client? client,
   required String url,

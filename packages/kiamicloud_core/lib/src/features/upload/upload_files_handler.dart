@@ -11,6 +11,7 @@ import '../../constants/kiami_strings.dart';
 import '../../utils/kiami_api_limits.dart';
 import '../../utils/format_bytes.dart';
 import '../../utils/upload_file_reader.dart';
+import '../../widgets/kiami_unavailable.dart';
 import '../files/providers/files_providers.dart';
 import 'upload_queue.dart';
 
@@ -38,10 +39,12 @@ Future<void> handleFilesForUpload({
           .read(kiamiProfileProvider.future)
           .timeout(const Duration(seconds: 25));
     } on TimeoutException {
-      _notify(showMessage, context, KiamiStrings.apiUnavailableTimeout);
+      if (!context.mounted) return;
+      await showKiamiNoConnectDialog(context);
       return;
-    } catch (_) {
-      _notify(showMessage, context, KiamiStrings.apiUnavailableTitle);
+    } catch (e) {
+      if (!context.mounted) return;
+      await showKiamiNoConnectDialog(context);
       return;
     }
   }

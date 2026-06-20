@@ -8,6 +8,7 @@ import '../../routing/kiami_routes.dart';
 import '../../theme/kiami_colors.dart';
 import '../../utils/format_bytes.dart';
 import '../../utils/kiami_layout.dart';
+import '../../widgets/kiami_api_unavailable_card.dart';
 import '../../widgets/subscription_banner.dart';
 import '../files/providers/files_providers.dart';
 import 'providers/admin_providers.dart';
@@ -118,10 +119,10 @@ class _AdminSubscriptionsPageState extends ConsumerState<AdminSubscriptionsPage>
                 child: Center(child: CircularProgressIndicator()),
               ),
               error: (e, _) => Padding(
-                padding: const EdgeInsets.only(top: 48),
-                child: Text(
-                  kiamiApiErrorMessage(e),
-                  textAlign: TextAlign.center,
+                padding: const EdgeInsets.only(top: 24),
+                child: KiamiApiUnavailableCard(
+                  error: e,
+                  onRetry: _refresh,
                 ),
               ),
             ),

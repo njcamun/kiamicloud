@@ -12,6 +12,7 @@ class KiamiFileActionsButton extends StatelessWidget {
     required this.onDownload,
     required this.onRename,
     required this.onDelete,
+    this.canDownload = true,
     this.iconSize = 22,
   });
 
@@ -19,6 +20,7 @@ class KiamiFileActionsButton extends StatelessWidget {
   final VoidCallback onDownload;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+  final bool canDownload;
   final double iconSize;
 
   @override
@@ -37,9 +39,10 @@ class KiamiFileActionsButton extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'download',
-          child: ListTile(
+          enabled: canDownload,
+          child: const ListTile(
             leading: Icon(Icons.download_outlined),
             title: Text(KiamiStrings.downloadButton),
             contentPadding: EdgeInsets.zero,

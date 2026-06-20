@@ -37,6 +37,8 @@ import '../activity/providers/profile_quota_sync_provider.dart';
 import '../backup/device_backup_flow.dart';
 import '../backup/device_backup_restore_flow.dart';
 import '../files/providers/files_providers.dart';
+import '../connectivity/connectivity_provider.dart';
+import '../../widgets/kiami_unavailable.dart';
 import '../../api/models/kiami_file.dart';
 import '../../api/models/kiami_profile.dart';
 
@@ -137,6 +139,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
     ref.watch(profileQuotaSyncProvider);
     final profileAsync = ref.watch(kiamiProfileProvider);
     final filesAsync = ref.watch(kiamiFilesViewProvider);
+    final isOnline = ref.watch(isOnlineProvider).valueOrNull ?? true;
+    final profileConnectionError = profileAsync.hasError &&
+        kiamiApiErrorIsConnection(profileAsync.error!);
+    final showNoConnectOnUpload = !isOnline || profileConnectionError;
     final queueState = ref.watch(uploadQueueProvider);
     UploadQueueItem? uploadingItem;
     for (final item in queueState.items) {
@@ -268,6 +274,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                                   profile: profile,
                                   profileLoading: profileAsync.isLoading,
                                   profileError: profileAsync.hasError,
+                                  showNoConnectOnUpload: showNoConnectOnUpload,
                                   queueProcessing: queueState.isProcessing,
                                   uploadProgress: uploadProgress,
                                   fullWidthUpload:
@@ -381,6 +388,7 @@ class _DashboardTopSection extends StatelessWidget {
     required this.profile,
     required this.profileLoading,
     required this.profileError,
+    required this.showNoConnectOnUpload,
     required this.queueProcessing,
     required this.uploadProgress,
     required this.fullWidthUpload,
@@ -393,6 +401,7 @@ class _DashboardTopSection extends StatelessWidget {
   final KiamiProfile? profile;
   final bool profileLoading;
   final bool profileError;
+  final bool showNoConnectOnUpload;
   final String maxPerFileLabel;
   final bool queueProcessing;
   final double uploadProgress;
@@ -421,14 +430,14 @@ class _DashboardTopSection extends StatelessWidget {
             if (p.access != null)
               SubscriptionBanner(
                 access: p.access!,
-                onRenew: () => context.push(KiamiRoutes.billing),
+                onRenew: () => showPlanChangeSupportDialog(context),
               ),
             QuotaBanner(
               quota: p.quota,
               storageUsedBytes: p.storageUsedBytes,
               quotaBytes: p.plan.quotaBytes,
               storageAvailableBytes: p.storageAvailableBytes,
-              onUpgrade: () => context.push(KiamiRoutes.billing),
+              onUpgrade: () => showPlanChangeSupportDialog(context),
             ),
           ],
           if (p != null && !fixedStorageCard) ...[
@@ -449,6 +458,13 @@ class _DashboardTopSection extends StatelessWidget {
               final cardWidth = fullWidthUpload
                   ? maxW.clamp(480.0, 1200.0)
                   : null;
+
+              if (showNoConnectOnUpload) {
+                return KiamiUploadIllustrationCard(
+                  cardWidth: cardWidth,
+                  child: const KiamiNoConnectIllustration(fit: BoxFit.cover),
+                );
+              }
 
               return UploadDropTarget(
                 enabled: uploadEnabled,

@@ -7,6 +7,7 @@ import '../../constants/kiami_strings.dart';
 import '../../utils/format_bytes.dart';
 import '../../utils/format_date.dart';
 import '../../utils/kiami_layout.dart';
+import '../../widgets/kiami_api_unavailable_card.dart';
 import '../../widgets/kiami_card.dart';
 import '../../widgets/kiami_page_header.dart';
 import '../files/providers/files_providers.dart';
@@ -79,7 +80,10 @@ class TrashPage extends ConsumerWidget {
             },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(
-              child: Text(kiamiApiErrorMessage(e)),
+              child: KiamiApiUnavailableCard(
+                error: e,
+                onRetry: () => ref.invalidate(trashFilesProvider),
+              ),
             ),
           ),
         ),

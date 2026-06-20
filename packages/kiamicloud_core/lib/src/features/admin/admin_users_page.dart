@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../constants/kiami_strings.dart';
 import '../../utils/kiami_layout.dart';
-import '../files/providers/files_providers.dart';
+import '../../widgets/kiami_api_unavailable_card.dart';
 import 'providers/admin_providers.dart';
 import 'widgets/admin_user_list_tile.dart';
 
@@ -150,19 +150,9 @@ class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
               ),
               error: (e, _) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Column(
-                  children: [
-                    Text(
-                      kiamiApiErrorMessage(e),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton.icon(
-                      onPressed: _refresh,
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text(KiamiStrings.adminRetry),
-                    ),
-                  ],
+                child: KiamiApiUnavailableCard(
+                  error: e,
+                  onRetry: _refresh,
                 ),
               ),
             ),

@@ -7,6 +7,7 @@ import '../../theme/kiami_decorations.dart';
 import '../../utils/format_bytes.dart';
 import '../../utils/format_date.dart';
 import '../../utils/kiami_layout.dart';
+import '../../widgets/kiami_api_unavailable_card.dart';
 import '../../widgets/kiami_card.dart';
 import '../auth/providers/auth_providers.dart';
 import '../billing/providers/billing_providers.dart';
@@ -14,6 +15,7 @@ import '../files/providers/files_providers.dart';
 import 'providers/admin_providers.dart';
 import 'widgets/admin_user_edit_form.dart';
 import 'widgets/admin_user_notifications_section.dart';
+import 'widgets/admin_user_subscription_section.dart';
 
 class AdminUserDetailPage extends ConsumerWidget {
   const AdminUserDetailPage({super.key, required this.uid});
@@ -149,8 +151,22 @@ class AdminUserDetailPage extends ConsumerWidget {
                 AdminUserNotificationsSection(uid: uid),
               ],
               const SizedBox(height: 16),
+              AdminUserSubscriptionSection(
+                uid: uid,
+                onChanged: () {
+                  ref.invalidate(adminUserDetailProvider(uid));
+                  ref.invalidate(adminUsersProvider);
+                  final currentUid =
+                      ref.read(authStateProvider).valueOrNull?.uid;
+                  if (currentUid != null && currentUid == uid) {
+                    refreshKiamiProfile(ref);
+                    ref.invalidate(billingStatusProvider);
+                  }
+                },
+              ),
+              const SizedBox(height: 20),
               Text(
-                KiamiStrings.adminEditUser,
+                KiamiStrings.adminPlanAndLimits,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -181,7 +197,13 @@ class AdminUserDetailPage extends ConsumerWidget {
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(kiamiApiErrorMessage(e), textAlign: TextAlign.center),
+            child: KiamiApiUnavailableCard(
+              error: e,
+              onRetry: () {
+                ref.invalidate(adminUserDetailProvider(uid));
+                ref.invalidate(adminPlansProvider);
+              },
+            ),
           ),
         ),
       ),

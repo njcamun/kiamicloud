@@ -54,9 +54,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final showAdminSection = ref.watch(adminSettingsSectionProvider);
     final canChangeServer = ref.watch(canSwitchApiEndpointProvider);
-    final currentServerLabel = KiamiApiConfig.usesCloudApi
-        ? KiamiStrings.settingsServerModeCloud
-        : KiamiStrings.settingsServerModeLocal;
     final showBack = kiamiShowsShellBackButton(context);
 
     return Column(
@@ -111,8 +108,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   child: _SettingsNavTile(
                     icon: Icons.dns_outlined,
                     title: KiamiStrings.settingsChangeServer,
-                    subtitle:
-                        '${KiamiStrings.settingsChangeServerHint} · $currentServerLabel',
+                    subtitle: KiamiStrings.settingsChangeServerHint,
                     showDivider: false,
                     onTap: () => context.push(KiamiRoutes.serverSettings),
                   ),

@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../api/kiami_api_client.dart';
 import '../../../api/kiami_api_exception.dart';
 import '../../../api/models/kiami_file.dart';
 import '../../../constants/kiami_strings.dart';
@@ -24,6 +25,7 @@ import 'file_actions_dialogs.dart';
 import 'file_gallery_page.dart';
 import 'file_preview_page.dart';
 import 'video_gallery_actions.dart';
+import '../../../widgets/kiami_unavailable.dart';
 
 /// Acções partilhadas (download, renomear, apagar) em listas de ficheiros.
 mixin KiamiFileListActions<T extends ConsumerStatefulWidget>
@@ -51,6 +53,9 @@ mixin KiamiFileListActions<T extends ConsumerStatefulWidget>
   }
 
   Future<void> downloadKiamiFile(KiamiFile file) async {
+    final online = ref.read(isOnlineProvider).valueOrNull ?? true;
+    if (!online) return;
+
     try {
       final bytes =
           await ref.read(kiamiApiClientProvider).downloadFileBytes(file.id);
@@ -65,6 +70,7 @@ mixin KiamiFileListActions<T extends ConsumerStatefulWidget>
       if (saved != null) showKiamiMessage(KiamiStrings.downloadSaved);
     } catch (e) {
       if (!mounted) return;
+      if (kiamiApiErrorIsConnection(e) || _isConnectionError(e)) return;
       KiamiErrorPresenter.showSnackBar(context, e);
     }
   }
@@ -76,6 +82,22 @@ mixin KiamiFileListActions<T extends ConsumerStatefulWidget>
     final contextFiles = filesInContext ?? [file];
     final index = contextFiles.indexWhere((f) => f.id == file.id);
     if (index < 0) return;
+
+    final online = ref.read(isOnlineProvider).valueOrNull ?? true;
+    if (!online && !FilePreviewPage.canPreview(file)) {
+      if (!mounted) return;
+      await showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierColor: Colors.black.withValues(alpha: 0.42),
+        barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+        pageBuilder: (_, __, ___) => const Material(
+          type: MaterialType.transparency,
+          child: KiamiPreviewIssueOverlay(connectionError: true),
+        ),
+      );
+      return;
+    }
 
     if (FilePreviewPage.canPreview(file)) {
       if (canPreviewTextFileName(file.name) &&
@@ -105,16 +127,28 @@ mixin KiamiFileListActions<T extends ConsumerStatefulWidget>
       context,
       files: contextFiles,
       initialIndex: index,
-      loadBytes: (KiamiFile f) async => Uint8List.fromList(
-        await ref.read(kiamiApiClientProvider).downloadFileBytes(f.id),
-      ),
-      loadMediaSource: (KiamiFile f) =>
-          ref.read(kiamiApiClientProvider).getFileDownloadInfo(f.id),
+      loadBytes: _previewLoadBytes,
+      loadMediaSource: _previewLoadMediaSource,
       onDownload: downloadKiamiFile,
+      downloadEnabled: ref.read(isOnlineProvider).valueOrNull ?? true,
       photoActions: _photoGalleryActions(contextFiles),
       videoActions: _videoGalleryActions(contextFiles),
       audioActions: _audioGalleryActions(contextFiles),
     );
+  }
+
+  Future<Uint8List> _previewLoadBytes(KiamiFile file) async {
+    final online = ref.read(isOnlineProvider).valueOrNull ?? true;
+    if (!online) throw KiamiApiClient.connectionError();
+    return Uint8List.fromList(
+      await ref.read(kiamiApiClientProvider).downloadFileBytes(file.id),
+    );
+  }
+
+  Future<MediaSource> _previewLoadMediaSource(KiamiFile file) async {
+    final online = ref.read(isOnlineProvider).valueOrNull ?? true;
+    if (!online) throw KiamiApiClient.connectionError();
+    return ref.read(kiamiApiClientProvider).getFileDownloadInfo(file.id);
   }
 
   AudioGalleryActions? _audioGalleryActions(List<KiamiFile> files) {

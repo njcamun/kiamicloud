@@ -4,6 +4,7 @@ import '../constants/kiami_strings.dart';
 import '../features/files/providers/files_providers.dart';
 import 'kiami_button.dart';
 import 'kiami_card.dart';
+import 'kiami_unavailable.dart';
 
 /// Estado amigável quando a API não responde (rede, servidor parado, etc.).
 class KiamiApiUnavailableCard extends StatelessWidget {
@@ -20,8 +21,11 @@ class KiamiApiUnavailableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (kiamiApiErrorIsConnection(error)) {
+      return KiamiNoConnectCard(compact: compact);
+    }
+
     final scheme = Theme.of(context).colorScheme;
-    final isConnection = kiamiApiErrorIsConnection(error);
 
     return KiamiCard(
       child: Column(
@@ -31,9 +35,7 @@ class KiamiApiUnavailableCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                isConnection
-                    ? Icons.cloud_off_outlined
-                    : Icons.error_outline_rounded,
+                Icons.error_outline_rounded,
                 color: scheme.error,
                 size: compact ? 22 : 28,
               ),
@@ -43,9 +45,7 @@ class KiamiApiUnavailableCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isConnection
-                          ? KiamiStrings.apiUnavailableTitle
-                          : KiamiStrings.apiErrorTitle,
+                      KiamiStrings.apiErrorTitle,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),

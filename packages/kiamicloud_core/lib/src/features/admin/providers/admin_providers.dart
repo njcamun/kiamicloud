@@ -144,6 +144,14 @@ final adminSecurityEventsProvider =
   return api.listAdminSecurityEvents(limit: 15);
 });
 
+final adminUserSubscriptionProvider =
+    FutureProvider.autoDispose.family<KiamiAdminSubscription?, String>(
+  (ref, uid) async {
+    final api = ref.watch(kiamiApiClientProvider);
+    return api.getAdminUserSubscription(uid);
+  },
+);
+
 class AdminUsersQuery {
   const AdminUsersQuery({
     this.search,

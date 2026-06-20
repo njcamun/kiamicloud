@@ -15,7 +15,7 @@ class DeviceBackupService {
   Future<DeviceRestoreResult> restore({
     required DeviceBackupScope scope,
     List<int>? contactsBytes,
-    List<int>? appsBytes,
+    Object? appsZipFile,
     required void Function(DeviceBackupProgress progress) onProgress,
     Future<void> Function(int current, int total)? onBeforeApkInstall,
   }) async =>

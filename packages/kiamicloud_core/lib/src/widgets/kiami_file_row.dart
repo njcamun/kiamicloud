@@ -18,6 +18,7 @@ class KiamiFileRow extends StatelessWidget {
     this.onOpen,
     this.selected = false,
     this.onSelectToggle,
+    this.canDownload = true,
   });
 
   final KiamiFile file;
@@ -27,6 +28,7 @@ class KiamiFileRow extends StatelessWidget {
   final VoidCallback onDownload;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+  final bool canDownload;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +64,7 @@ class KiamiFileRow extends StatelessWidget {
           onDownload: onDownload,
           onRename: onRename,
           onDelete: onDelete,
+          canDownload: canDownload,
         ),
       ),
     );

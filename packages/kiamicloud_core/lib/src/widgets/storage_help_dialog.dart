@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../api/models/kiami_profile.dart';
 import '../api/kiami_api_config.dart';
 import '../constants/kiami_constants.dart';
 import '../constants/kiami_strings.dart';
-import '../routing/kiami_routes.dart';
 import '../utils/format_bytes.dart';
+import '../utils/kiami_support_contact.dart';
 
 /// Explica o armazenamento, quotas e upgrade de plano.
 Future<void> showStorageHelpDialog(
@@ -78,9 +77,9 @@ Future<void> showStorageHelpDialog(
           FilledButton.icon(
             onPressed: () {
               Navigator.pop(ctx);
-              context.push(KiamiRoutes.billing);
+              showPlanChangeSupportDialog(context);
             },
-            icon: const Icon(Icons.workspace_premium_outlined, size: 18),
+            icon: const Icon(Icons.support_agent_outlined, size: 18),
             label: const Text(KiamiStrings.storageHelpUpgradeButton),
           ),
       ],

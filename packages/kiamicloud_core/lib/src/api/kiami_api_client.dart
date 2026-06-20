@@ -333,6 +333,105 @@ class KiamiApiClient {
     return file;
   }
 
+  Future<KiamiFile> uploadFilePath({
+    required String name,
+    required String filePath,
+    required int sizeBytes,
+    String? mimeType,
+    UploadProgressCallback? onProgress,
+  }) async {
+    final resolvedMime = mimeType ?? 'application/octet-stream';
+    final init = await initUpload(
+      name: name,
+      sizeBytes: sizeBytes,
+      mimeType: resolvedMime,
+    );
+
+    final viaWorker = kIsWeb || init.localDevUpload;
+    final putUrl = viaWorker
+        ? _uri('/files/upload/direct/${init.fileId}').toString()
+        : init.uploadUrl;
+
+    final putResponse = await _putUploadFile(
+      path: filePath,
+      sizeBytes: sizeBytes,
+      url: putUrl,
+      contentType: resolvedMime,
+      useAuth: viaWorker,
+      onProgress: onProgress,
+    );
+
+    if (putResponse.statusCode < 200 || putResponse.statusCode >= 300) {
+      _throwUploadPutFailure(putResponse);
+    }
+
+    KiamiFile uploaded;
+    if (viaWorker) {
+      uploaded = _parseUploadPutFile(putResponse);
+    } else {
+      uploaded = await completeUpload(init.fileId);
+    }
+
+    return uploaded;
+  }
+
+  Future<http.Response> _putUploadFile({
+    required String path,
+    required int sizeBytes,
+    required String url,
+    required String contentType,
+    required bool useAuth,
+    UploadProgressCallback? onProgress,
+  }) async {
+    final headers = <String, String>{};
+    if (useAuth) {
+      final token = await FirebaseIdTokenService.getIdToken();
+      if (token == null) {
+        throw KiamiApiException('Sessão expirada. Inicie sessão novamente.');
+      }
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    try {
+      final result = await putUploadFile(
+        client: _http,
+        url: url,
+        filePath: path,
+        totalBytes: sizeBytes,
+        contentType: contentType,
+        headers: headers,
+        onProgress: onProgress,
+        timeout: _transferTimeout(sizeBytes),
+      );
+
+      if (result.statusCode == 0) {
+        throw connectionError();
+      }
+
+      return http.Response(
+        result.body,
+        result.statusCode,
+        headers: const {},
+      );
+    } on TimeoutException {
+      throw KiamiApiException(
+        KiamiStrings.apiUnavailableTimeout,
+        errorCode: 'connection_failed',
+      );
+    } on KiamiApiException {
+      rethrow;
+    } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('SocketException') ||
+          msg.contains('Connection') ||
+          msg.contains('Failed to fetch') ||
+          msg.contains('NetworkError')) {
+        throw connectionError();
+      }
+      rethrow;
+    }
+  }
+
   Future<http.Response> _putUploadBytes({
     required String url,
     required List<int> bytes,
@@ -1074,6 +1173,22 @@ class KiamiApiClient {
       ),
     );
     if (response.statusCode != 200) _throwFromResponse(response);
+  }
+
+  Future<KiamiAdminSubscription?> getAdminUserSubscription(String uid) async {
+    final headers = await _authHeaders();
+    final response = await _run(
+      () => _http.get(
+        _uri('/admin/users/$uid/subscription'),
+        headers: headers,
+      ),
+    );
+    if (response.statusCode == 404) return null;
+    if (response.statusCode != 200) _throwFromResponse(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final sub = json['subscription'];
+    if (sub == null) return null;
+    return KiamiAdminSubscription.fromJson(sub as Map<String, dynamic>);
   }
 
   Future<void> adjustAdminSubscriptionEndsAt({

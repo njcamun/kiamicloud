@@ -8,6 +8,7 @@ import '../../api/models/kiami_admin.dart';
 import '../../constants/kiami_strings.dart';
 import '../../theme/kiami_colors.dart';
 import '../../utils/kiami_layout.dart';
+import '../../widgets/kiami_api_unavailable_card.dart';
 import '../activity/providers/account_activity_providers.dart';
 import '../files/providers/files_providers.dart';
 import 'providers/admin_providers.dart';
@@ -56,10 +57,14 @@ class AdminCheckoutsPage extends ConsumerWidget {
           error: (e, _) => ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
-              const SizedBox(height: 48),
+              const SizedBox(height: 24),
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(kiamiApiErrorMessage(e), textAlign: TextAlign.center),
+                child: KiamiApiUnavailableCard(
+                  error: e,
+                  onRetry: () =>
+                      ref.invalidate(adminCheckoutsProvider(_checkoutReviewStatus)),
+                ),
               ),
             ],
           ),

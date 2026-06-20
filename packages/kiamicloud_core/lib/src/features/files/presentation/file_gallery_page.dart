@@ -10,6 +10,7 @@ import '../../../constants/kiami_strings.dart';
 import '../../../theme/kiami_colors.dart';
 import '../../../theme/kiami_decorations.dart';
 import '../../../theme/kiami_spacing.dart';
+import '../../../widgets/kiami_unavailable.dart';
 import '../../photos/presentation/photo_gallery_actions.dart';
 import 'audio_gallery_actions.dart';
 import 'file_preview_page.dart';
@@ -24,6 +25,7 @@ class FileGalleryPage extends StatefulWidget {
     required this.loadBytes,
     required this.loadMediaSource,
     this.onDownload,
+    this.downloadEnabled = true,
     this.photoActions,
     this.videoActions,
     this.audioActions,
@@ -34,6 +36,7 @@ class FileGalleryPage extends StatefulWidget {
   final Future<Uint8List> Function(KiamiFile file) loadBytes;
   final Future<MediaSource> Function(KiamiFile file) loadMediaSource;
   final void Function(KiamiFile file)? onDownload;
+  final bool downloadEnabled;
   final PhotoGalleryActions? photoActions;
   final VideoGalleryActions? videoActions;
   final AudioGalleryActions? audioActions;
@@ -47,6 +50,7 @@ class FileGalleryPage extends StatefulWidget {
     required Future<Uint8List> Function(KiamiFile file) loadBytes,
     required Future<MediaSource> Function(KiamiFile file) loadMediaSource,
     void Function(KiamiFile file)? onDownload,
+    bool downloadEnabled = true,
     PhotoGalleryActions? photoActions,
     VideoGalleryActions? videoActions,
     AudioGalleryActions? audioActions,
@@ -59,6 +63,7 @@ class FileGalleryPage extends StatefulWidget {
       loadBytes: loadBytes,
       loadMediaSource: loadMediaSource,
       onDownload: onDownload,
+      downloadEnabled: downloadEnabled,
       photoActions: photoActions,
       videoActions: videoActions,
       audioActions: audioActions,
@@ -238,7 +243,9 @@ class _FileGalleryPageState extends State<FileGalleryPage> {
             if (widget.onDownload != null)
               IconButton(
                 tooltip: KiamiStrings.downloadButton,
-                onPressed: () => widget.onDownload!(file),
+                onPressed: widget.downloadEnabled
+                    ? () => widget.onDownload!(file)
+                    : null,
                 icon: const Icon(Icons.download_outlined),
               ),
           ],
@@ -254,6 +261,7 @@ class _FileGalleryPageState extends State<FileGalleryPage> {
               loadBytes: widget.loadBytes,
               loadMediaSource: widget.loadMediaSource,
               onDownload: widget.onDownload,
+              downloadEnabled: widget.downloadEnabled,
             );
           },
         ),
@@ -273,7 +281,9 @@ class _FileGalleryPageState extends State<FileGalleryPage> {
                       const Spacer(),
                       if (!canPreview && widget.onDownload != null)
                         TextButton.icon(
-                          onPressed: () => widget.onDownload!(file),
+                          onPressed: widget.downloadEnabled
+                              ? () => widget.onDownload!(file)
+                              : null,
                           icon: const Icon(Icons.download_outlined, size: 18),
                           label: const Text(KiamiStrings.downloadButton),
                         ),
@@ -424,6 +434,7 @@ class _FileGalleryPageState extends State<FileGalleryPage> {
                 ),
                 _MediaDownloadDeleteBar(
                   file: file,
+                  downloadEnabled: widget.downloadEnabled,
                   onDownload: () =>
                       widget.videoActions!.onDownload(file),
                   onDelete: () => widget.videoActions!.onDelete(file),
@@ -517,6 +528,7 @@ class _FileGalleryPageState extends State<FileGalleryPage> {
                 ),
                 _MediaDownloadDeleteBar(
                   file: file,
+                  downloadEnabled: widget.downloadEnabled,
                   onDownload: () =>
                       widget.audioActions!.onDownload(file),
                   onDelete: () => widget.audioActions!.onDelete(file),
@@ -659,7 +671,9 @@ class _FileGalleryPageState extends State<FileGalleryPage> {
             if (widget.onDownload != null)
               IconButton(
                 tooltip: KiamiStrings.downloadButton,
-                onPressed: () => widget.onDownload!(file),
+                onPressed: widget.downloadEnabled
+                    ? () => widget.onDownload!(file)
+                    : null,
                 icon: const Icon(Icons.download_outlined),
               ),
           ],
@@ -736,6 +750,7 @@ class _FullscreenPhotoPageState extends State<_FullscreenPhotoPage>
     with AutomaticKeepAliveClientMixin {
   Uint8List? _bytes;
   String? _error;
+  bool _connectionError = false;
   bool _started = false;
 
   @override
@@ -752,8 +767,10 @@ class _FullscreenPhotoPageState extends State<_FullscreenPhotoPage>
     _started = true;
     try {
       _bytes = await widget.loadBytes(widget.file);
-    } catch (_) {
-      _error = KiamiStrings.previewLoadError;
+    } catch (e) {
+      final issue = _galleryErrorFrom(e);
+      _connectionError = issue.connection;
+      _error = issue.message;
     }
     if (mounted) setState(() {});
   }
@@ -763,15 +780,9 @@ class _FullscreenPhotoPageState extends State<_FullscreenPhotoPage>
     super.build(context);
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            _error!,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70),
-          ),
-        ),
+      return _galleryIssueView(
+        context: context,
+        connectionError: _connectionError,
       );
     }
 
@@ -816,6 +827,7 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage>
     with AutomaticKeepAliveClientMixin {
   MediaSource? _mediaSource;
   String? _error;
+  bool _connectionError = false;
   bool _started = false;
 
   @override
@@ -832,8 +844,10 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage>
     _started = true;
     try {
       _mediaSource = await widget.loadMediaSource(widget.file);
-    } catch (_) {
-      _error = KiamiStrings.previewLoadError;
+    } catch (e) {
+      final issue = _galleryErrorFrom(e);
+      _connectionError = issue.connection;
+      _error = issue.message;
     }
     if (mounted) setState(() {});
   }
@@ -843,15 +857,9 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage>
     super.build(context);
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            _error!,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70),
-          ),
-        ),
+      return _galleryIssueView(
+        context: context,
+        connectionError: _connectionError,
       );
     }
 
@@ -895,6 +903,7 @@ class _FullscreenAudioPageState extends State<_FullscreenAudioPage>
     with AutomaticKeepAliveClientMixin {
   MediaSource? _mediaSource;
   String? _error;
+  bool _connectionError = false;
   bool _started = false;
 
   @override
@@ -911,8 +920,10 @@ class _FullscreenAudioPageState extends State<_FullscreenAudioPage>
     _started = true;
     try {
       _mediaSource = await widget.loadMediaSource(widget.file);
-    } catch (_) {
-      _error = KiamiStrings.previewLoadError;
+    } catch (e) {
+      final issue = _galleryErrorFrom(e);
+      _connectionError = issue.connection;
+      _error = issue.message;
     }
     if (mounted) setState(() {});
   }
@@ -922,15 +933,9 @@ class _FullscreenAudioPageState extends State<_FullscreenAudioPage>
     super.build(context);
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            _error!,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70),
-          ),
-        ),
+      return _galleryIssueView(
+        context: context,
+        connectionError: _connectionError,
       );
     }
 
@@ -986,6 +991,7 @@ class _VisualCarouselCardState extends State<_VisualCarouselCard>
   MediaSource? _mediaSource;
   double? _aspectRatio;
   String? _error;
+  bool _connectionError = false;
   bool _started = false;
 
   @override
@@ -1041,8 +1047,10 @@ class _VisualCarouselCardState extends State<_VisualCarouselCard>
         _bytes = await widget.loadBytes(widget.file);
         _aspectRatio = await _probeImageAspect(_bytes!) ?? 1.0;
       }
-    } catch (_) {
-      _error = KiamiStrings.previewLoadError;
+    } catch (e) {
+      final issue = _galleryErrorFrom(e);
+      _connectionError = issue.connection;
+      _error = issue.message;
     }
     if (mounted) setState(() {});
   }
@@ -1109,11 +1117,9 @@ class _VisualCarouselCardState extends State<_VisualCarouselCard>
 
   Widget _buildContent(BuildContext context) {
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(_error!, textAlign: TextAlign.center),
-        ),
+      return _galleryIssueView(
+        context: context,
+        connectionError: _connectionError,
       );
     }
 
@@ -1147,12 +1153,14 @@ class _GalleryFilePage extends StatefulWidget {
     required this.loadBytes,
     required this.loadMediaSource,
     this.onDownload,
+    this.downloadEnabled = true,
   });
 
   final KiamiFile file;
   final Future<Uint8List> Function(KiamiFile file) loadBytes;
   final Future<MediaSource> Function(KiamiFile file) loadMediaSource;
   final void Function(KiamiFile file)? onDownload;
+  final bool downloadEnabled;
 
   @override
   State<_GalleryFilePage> createState() => _GalleryFilePageState();
@@ -1163,6 +1171,7 @@ class _GalleryFilePageState extends State<_GalleryFilePage>
   Uint8List? _bytes;
   MediaSource? _mediaSource;
   String? _error;
+  bool _connectionError = false;
   bool _started = false;
 
   @override
@@ -1187,8 +1196,10 @@ class _GalleryFilePageState extends State<_GalleryFilePage>
       } else {
         _bytes = await widget.loadBytes(widget.file);
       }
-    } catch (_) {
-      _error = KiamiStrings.previewLoadError;
+    } catch (e) {
+      final issue = _galleryErrorFrom(e);
+      _connectionError = issue.connection;
+      _error = issue.message;
     }
     if (mounted) setState(() {});
   }
@@ -1203,15 +1214,14 @@ class _GalleryFilePageState extends State<_GalleryFilePage>
         onDownload: widget.onDownload == null
             ? null
             : () => widget.onDownload!(widget.file),
+        downloadEnabled: widget.downloadEnabled,
       );
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(_error!, textAlign: TextAlign.center),
-        ),
+      return _galleryIssueView(
+        context: context,
+        connectionError: _connectionError,
       );
     }
 
@@ -1235,17 +1245,49 @@ class _GalleryFilePageState extends State<_GalleryFilePage>
   }
 }
 
+String _galleryLoadErrorMessage(Object error) {
+  return kiamiPreviewConnectionIssue(error)
+      ? KiamiStrings.noConnectTitle
+      : KiamiStrings.previewLoadError;
+}
+
+({String message, bool connection}) _galleryErrorFrom(Object error) {
+  return (
+    connection: kiamiPreviewConnectionIssue(error),
+    message: _galleryLoadErrorMessage(error),
+  );
+}
+
+Widget _galleryIssueView({
+  required BuildContext context,
+  required bool connectionError,
+}) {
+  return KiamiPreviewIssueOverlay(
+    connectionError: connectionError,
+    onDismiss: () => Navigator.of(context).maybePop(),
+  );
+}
+
 class _UnsupportedPreview extends StatelessWidget {
   const _UnsupportedPreview({
     required this.file,
     this.onDownload,
+    this.downloadEnabled = true,
   });
 
   final KiamiFile file;
   final VoidCallback? onDownload;
+  final bool downloadEnabled;
 
   @override
   Widget build(BuildContext context) {
+    if (onDownload != null && !downloadEnabled) {
+      return _galleryIssueView(
+        context: context,
+        connectionError: true,
+      );
+    }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -1274,7 +1316,7 @@ class _UnsupportedPreview extends StatelessWidget {
             if (onDownload != null) ...[
               const SizedBox(height: 20),
               FilledButton.icon(
-                onPressed: onDownload,
+                onPressed: downloadEnabled ? onDownload : null,
                 icon: const Icon(Icons.download_outlined),
                 label: const Text(KiamiStrings.downloadButton),
               ),
@@ -1354,11 +1396,13 @@ class _MediaDownloadDeleteBar extends StatelessWidget {
     required this.file,
     required this.onDownload,
     required this.onDelete,
+    this.downloadEnabled = true,
   });
 
   final KiamiFile file;
   final VoidCallback onDownload;
   final Future<void> Function() onDelete;
+  final bool downloadEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -1380,7 +1424,7 @@ class _MediaDownloadDeleteBar extends StatelessWidget {
               _PhotoActionButton(
                 icon: Icons.download_outlined,
                 label: KiamiStrings.downloadButton,
-                onPressed: onDownload,
+                onPressed: downloadEnabled ? onDownload : null,
               ),
               _PhotoActionButton(
                 icon: Icons.delete_outline_rounded,
@@ -1402,32 +1446,44 @@ class _PhotoActionButton extends StatelessWidget {
   const _PhotoActionButton({
     required this.icon,
     required this.label,
-    required this.onPressed,
+    this.onPressed,
     this.iconColor,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    final color = enabled
+        ? iconColor
+        : Theme.of(context).disabledColor;
+
     return InkWell(
       onTap: onPressed,
       borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 22, color: iconColor),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-          ],
+      child: Opacity(
+        opacity: enabled ? 1 : 0.45,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 22, color: color),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: enabled
+                          ? null
+                          : Theme.of(context).disabledColor,
+                    ),
+              ),
+            ],
+          ),
         ),
       ),
     );

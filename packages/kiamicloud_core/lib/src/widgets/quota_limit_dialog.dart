@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../constants/kiami_strings.dart';
-import '../routing/kiami_routes.dart';
 import '../utils/format_bytes.dart';
+import '../utils/kiami_support_contact.dart';
 
 /// Diálogo quando o ficheiro ou a quota impedem o upload.
 Future<void> showQuotaLimitDialog(
@@ -54,9 +53,9 @@ Future<void> showQuotaLimitDialog(
           FilledButton.icon(
             onPressed: () {
               Navigator.pop(ctx);
-              context.push(KiamiRoutes.billing);
+              showPlanChangeSupportDialog(context);
             },
-            icon: const Icon(Icons.arrow_upward_rounded, size: 18),
+            icon: const Icon(Icons.support_agent_outlined, size: 18),
             label: const Text(KiamiStrings.quotaLimitUpgradeButton),
           ),
       ],

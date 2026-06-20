@@ -93,8 +93,9 @@ abstract final class KiamiStrings {
       'Apague ficheiros antigos ou faça upgrade para aumentar a quota.';
   static const String quotaLimitDialogTitle = 'Limite de armazenamento';
   static const String quotaLimitUpgradeHint =
-      'Faça upgrade do plano para obter mais espaço e voltar a enviar ficheiros maiores.';
-  static const String quotaLimitUpgradeButton = 'Ver planos';
+      'Para aumentar o armazenamento ou o limite por ficheiro, contacte o suporte '
+      'por WhatsApp ou e-mail.';
+  static const String quotaLimitUpgradeButton = 'Contactar suporte';
   static String quotaLimitDialogSizes(String fileSize, String available) =>
       'Tamanho do ficheiro: $fileSize · Espaço disponível: $available';
   static const String storageHelpTitle = 'Como funciona o armazenamento';
@@ -116,16 +117,16 @@ abstract final class KiamiStrings {
   static const String storageHelpAlertsBody =
       'Acima de 80% aparece um aviso amarelo; acima de 95%, aviso crítico. '
       'Com a quota cheia (100%), o upload fica desactivado até libertar espaço.';
-  static const String storageHelpUpgradeTitle = 'Upgrade do plano';
+  static const String storageHelpUpgradeTitle = 'Alterar plano';
   static const String storageHelpUpgradeBody =
-      'Em Planos e pagamentos pode escolher um plano com mais armazenamento. '
-      'Após o pagamento (ou confirmação em modo desenvolvimento), a nova quota '
-      'é aplicada de imediato e pode voltar a enviar ficheiros.';
-  static const String storageHelpUpgradeButton = 'Fazer upgrade';
+      'A actualização de plano é feita pela nossa equipa. '
+      'Contacte o suporte por WhatsApp ou e-mail para pedir mais armazenamento '
+      'ou um plano superior.';
+  static const String storageHelpUpgradeButton = 'Contactar suporte';
   static const String storageHelpTooltip = 'Como funciona o armazenamento';
   static const String settingsQuotaTitle = 'Armazenamento e plano';
   static const String settingsUpgradeHint =
-      'Faça upgrade para mais armazenamento.';
+      'Contacte o suporte para alterar o plano ou aumentar o armazenamento.';
   static const String settingsBilling = 'Planos e pagamentos';
   static const String settingsPrivacySection = 'Privacidade e conta';
   static const String settingsTerms = 'Termos de utilização';
@@ -184,7 +185,7 @@ abstract final class KiamiStrings {
   static String photoAlbumPhotoCount(int count) =>
       count == 1 ? '1 foto' : '$count fotos';
   static String photoAddedToAlbum(String name) => 'Adicionado a «$name».';
-  static const String quotaBannerUpgradeHint = 'Toque para ver planos';
+  static const String quotaBannerUpgradeHint = 'Toque para contactar suporte';
   static const String billingUpgradeSuccessAction = 'Ver armazenamento';
   static const String settingsAudit = 'Actividade recente';
   static const String settingsAuditEmpty = 'Sem actividade registada.';
@@ -192,10 +193,20 @@ abstract final class KiamiStrings {
   static const String billingCurrentPlan = 'Plano actual';
   static const String billingFreePlan = 'Gratuito';
   static const String billingPerMonth = '/mês';
-  static const String billingUpgradeTitle = 'Fazer upgrade';
+  static const String billingUpgradeTitle = 'Alterar plano';
   static const String billingUpgradeHint =
-      'Escolha um plano superior. Efectue a transferência e envie o comprovativo.';
-  static const String billingUpgradeButton = 'Escolher';
+      'A actualização e renovação de plano são tratadas pela nossa equipa. '
+      'Use o botão abaixo para falar connosco por WhatsApp ou e-mail.';
+  static const String billingUpgradeButton = 'Contactar suporte';
+  static const String planChangeSupportTitle = 'Alterar ou renovar plano';
+  static const String planChangeSupportBody =
+      'A actualização de plano e a renovação da subscrição são feitas manualmente '
+      'pela nossa equipa. Escolha WhatsApp ou e-mail para nos contactar.';
+  static const String planChangeSupportAction = 'Contactar suporte';
+  static const String planChangeSupportWhatsAppMessage =
+      'Olá, gostaria de alterar ou renovar o meu plano KiamiCloud.';
+  static const String planChangeSupportEmailSubject =
+      'Plano / subscrição KiamiCloud';
   static const String billingCurrentBadge = 'Actual';
   static const String billingCheckoutCreated = 'Referência de pagamento criada.';
   static const String billingPlanActivated = 'Plano activado com sucesso.';
@@ -227,7 +238,7 @@ abstract final class KiamiStrings {
   static const String billingDevSimulateHint =
       'Modo desenvolvimento: confirme o pagamento abaixo para activar o plano sem comprovativo.';
   static const String billingSimulatePay = 'Confirmar pagamento (dev)';
-  static const String subscriptionBannerAction = 'Renovar plano';
+  static const String subscriptionBannerAction = 'Contactar suporte';
   static const String subscriptionStatusTitle = 'Estado da subscrição';
   static const String subscriptionStatusActive = 'Activa';
   static const String subscriptionStatusGrace = 'Período de tolerância';
@@ -256,15 +267,15 @@ abstract final class KiamiStrings {
   }
 
   static const String subscriptionStorageOverQuota =
-      'O espaço utilizado excede o limite do plano. Remova ficheiros ou actualize a subscrição.';
+      'O espaço utilizado excede o limite do plano. Remova ficheiros ou contacte o suporte para alterar o plano.';
   static const String subscriptionGracePeriod =
-      'A subscrição expirou. Renove nos próximos dias para manter todos os acessos.';
+      'A subscrição expirou. Contacte o suporte nos próximos dias para renovar e manter todos os acessos.';
   static const String subscriptionRestricted =
-      'Subscrição em atraso: novos uploads bloqueados. Renove o plano para continuar.';
+      'Subscrição em atraso: novos uploads bloqueados. Contacte o suporte para renovar o plano.';
   static const String subscriptionSuspended =
-      'Conta suspensa por falta de pagamento. Renove para recuperar acesso.';
+      'Conta suspensa por falta de pagamento. Contacte o suporte para recuperar o acesso.';
   static const String subscriptionPendingDeletion =
-      'Conta será eliminada em breve. Renove imediatamente para evitar perda de dados.';
+      'Conta será eliminada em breve. Contacte o suporte imediatamente para evitar perda de dados.';
   static const String subscriptionDeleted = 'Conta eliminada.';
   static const String subscriptionInactive =
       'Operação não permitida no estado actual da subscrição.';
@@ -336,6 +347,12 @@ abstract final class KiamiStrings {
   static const String selectionCount = 'seleccionado(s)';
   static const String offlineBannerMessage =
       'Sem ligação. A mostrar os últimos dados guardados.';
+  static const String noConnectTitle = 'Sem ligação';
+  static const String connectTitle = 'Ligação OK';
+  static const String noConnectOfflineSubtitle =
+      'Verifique a sua ligação à internet e tente novamente.';
+  static const String noConnectVerify = 'Verificar';
+  static const String fileUnavailableTitle = 'Ficheiro indisponível';
   static String uploadQueueTitle(int n) =>
       n == 1 ? '1 envio na fila' : '$n envios na fila';
   static const String uploadQueueRetry = 'Repetir';
@@ -446,10 +463,14 @@ abstract final class KiamiStrings {
   static const String adminManageSection = 'Gestão';
   static const String adminManageUsers = 'Gerir utilizadores';
   static const String adminManageUsersHint =
-      'Listar, pesquisar e ajustar planos';
+      'Listar, pesquisar, planos e subscrições';
+  static const String adminSubscriptionSection = 'Subscrição';
+  static const String adminSubscriptionNone =
+      'Sem registo de subscrição activo para este utilizador.';
   static const String adminMemberSince = 'desde';
   static const String adminSecurityTitle = 'Eventos de segurança';
   static const String adminEditUser = 'Editar utilizador';
+  static const String adminPlanAndLimits = 'Plano e limites';
   static const String adminPlanLabel = 'Plano';
   static const String adminStorageSection = 'Armazenamento';
   static const String adminStorageCapacity = 'Capacidade do plano';
@@ -629,6 +650,15 @@ abstract final class KiamiStrings {
       'Permissão negada. Active o acesso a contactos nas definições do sistema.';
   static String deviceBackupFailed(String detail) =>
       'Falha no back-up: $detail';
+  static const String deviceBackupPlanRequiredTitle =
+      'Back-up disponível no plano Plus';
+  static const String deviceBackupPlanRequiredBody =
+      'O back-up e restore do dispositivo (contactos e apps) está incluído '
+      'a partir do plano Plus. Contacte o suporte para actualizar o seu plano.';
+  static const String deviceBackupPlanSupportWhatsApp =
+      'Olá, gostaria de activar o back-up do dispositivo (plano Plus ou superior).';
+  static const String deviceBackupPlanProfileError =
+      'Não foi possível verificar o seu plano. Tente novamente.';
 
   static const String deviceRestoreTooltip = 'Restaurar back-up';
   static const String deviceBackupMenuBackup = 'Criar back-up';

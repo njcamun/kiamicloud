@@ -4,20 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/kiami_api_client.dart';
-import '../../api/kiami_api_config.dart';
 import '../../constants/kiami_constants.dart';
 import '../../constants/kiami_strings.dart';
 import '../../data/api_endpoint_store.dart';
 import '../../routing/kiami_routes.dart';
-import '../../theme/kiami_colors.dart';
 import '../../utils/kiami_layout.dart';
 import '../../utils/kiami_local_api_url.dart';
-import '../../widgets/kiami_card.dart';
 import '../../widgets/kiami_page_header.dart';
+import '../../widgets/kiami_unavailable.dart';
 import '../files/providers/files_providers.dart';
 import 'providers/api_endpoint_providers.dart';
 
 /// Escolha de servidor Cloudflare vs CasaOS (utilizadores autorizados).
+enum _ServerTestVisual { none, connected, noConnect }
+
 class ApiEndpointSettingsPage extends ConsumerStatefulWidget {
   const ApiEndpointSettingsPage({super.key});
 
@@ -35,6 +35,7 @@ class _ApiEndpointSettingsPageState
   bool _saving = false;
   bool _testPassed = false;
   String? _lastTestedUrl;
+  _ServerTestVisual _testVisual = _ServerTestVisual.none;
 
   @override
   void initState() {
@@ -58,7 +59,14 @@ class _ApiEndpointSettingsPageState
       _loading = false;
       _testPassed = false;
       _lastTestedUrl = null;
+      _testVisual = _ServerTestVisual.none;
     });
+  }
+
+  void _resetTestState() {
+    _testPassed = false;
+    _lastTestedUrl = null;
+    _testVisual = _ServerTestVisual.none;
   }
 
   String get _cloudUrl => KiamiConstants.cloudBetaApiBaseUrl;
@@ -78,42 +86,38 @@ class _ApiEndpointSettingsPageState
         // URL cloud é fixo e fiável — não exige teste manual.
         _testPassed = true;
         _lastTestedUrl = _cloudUrl;
+        _testVisual = _ServerTestVisual.none;
       } else {
-        _testPassed = false;
-        _lastTestedUrl = null;
+        _resetTestState();
       }
     });
   }
 
   void _onHostChanged(String _) {
-    setState(() {
-      _testPassed = false;
-      _lastTestedUrl = null;
-    });
+    setState(_resetTestState);
   }
 
   Future<void> _testConnection() async {
     final url = _resolveDraftUrl();
-    setState(() => _testing = true);
+    setState(() {
+      _testing = true;
+      _testVisual = _ServerTestVisual.none;
+    });
     try {
       await KiamiApiClient.pingHealthAt(url);
       if (!mounted) return;
       setState(() {
         _testPassed = true;
         _lastTestedUrl = url;
+        _testVisual = _ServerTestVisual.connected;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(KiamiStrings.settingsServerTestOk)),
-      );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _testPassed = false;
         _lastTestedUrl = null;
+        _testVisual = _ServerTestVisual.noConnect;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(kiamiApiErrorMessage(e))),
-      );
     } finally {
       if (mounted) setState(() => _testing = false);
     }
@@ -195,7 +199,6 @@ class _ApiEndpointSettingsPageState
 
     final scheme = Theme.of(context).colorScheme;
     final showBack = kiamiShowsShellBackButton(context);
-    final currentUrl = KiamiApiConfig.baseUrl;
     final canSave = _testPassed && _lastTestedUrl == _resolveDraftUrl();
 
     return Column(
@@ -223,36 +226,6 @@ class _ApiEndpointSettingsPageState
                     bottomExtra: 24,
                   ),
                   children: [
-                    KiamiCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            KiamiStrings.settingsServerCurrent,
-                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            currentUrl,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            KiamiApiConfig.usesCloudApi
-                                ? KiamiStrings.settingsServerModeCloud
-                                : KiamiStrings.settingsServerModeLocal,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: KiamiColors.primaryBlue,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     Text(
                       KiamiStrings.settingsServerModeLabel,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -318,24 +291,12 @@ class _ApiEndpointSettingsPageState
                           : const Icon(Icons.wifi_tethering_rounded),
                       label: Text(KiamiStrings.settingsServerTest),
                     ),
-                    if (_testPassed) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle_outline,
-                            size: 18,
-                            color: scheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              KiamiStrings.settingsServerTestOk,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ),
-                        ],
-                      ),
+                    if (_testVisual == _ServerTestVisual.connected) ...[
+                      const SizedBox(height: 12),
+                      const KiamiConnectCard(compact: true),
+                    ] else if (_testVisual == _ServerTestVisual.noConnect) ...[
+                      const SizedBox(height: 12),
+                      const KiamiNoConnectCard(compact: true),
                     ],
                     const SizedBox(height: 20),
                     FilledButton(

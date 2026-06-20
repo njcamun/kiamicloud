@@ -1,21 +1,30 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../../api/models/kiami_file.dart';
 import '../../constants/kiami_strings.dart';
 import '../../utils/format_bytes.dart';
 import '../../utils/kiami_platform.dart';
 import '../files/providers/files_providers.dart';
+import 'device_backup_access.dart';
 import 'device_backup_service.dart';
 
-Future<void> _popRootDialog(BuildContext context) async {
-  if (!context.mounted) return;
-  await SchedulerBinding.instance.endOfFrame;
+Future<void> _dismissRootDialog(
+  BuildContext context,
+  Future<void>? dialogFuture,
+) async {
   if (!context.mounted) return;
   final navigator = Navigator.of(context, rootNavigator: true);
   if (navigator.canPop()) {
     navigator.pop();
+  }
+  if (dialogFuture != null) {
+    await dialogFuture;
   }
 }
 
@@ -39,6 +48,8 @@ String _formatBackupStamp(String stamp) {
 /// Lista back-ups na cloud e restaura no dispositivo (Android).
 Future<void> runDeviceRestoreFlow(BuildContext context, WidgetRef ref) async {
   if (!kiamiDeviceBackupSupported()) return;
+  if (!await ensureDeviceBackupPlanAccess(context, ref)) return;
+  if (!context.mounted) return;
 
   final files = ref.read(kiamiFilesProvider).valueOrNull ?? const <KiamiFile>[];
   final sets = groupKiamiBackupFiles(files);
@@ -92,13 +103,14 @@ Future<void> runDeviceRestoreFlow(BuildContext context, WidgetRef ref) async {
   );
 
   var progressVisible = false;
+  var progressClosed = false;
   if (!context.mounted) {
     progressNotifier.dispose();
     return;
   }
 
   progressVisible = true;
-  showDialog<void>(
+  final progressDialogFuture = showDialog<void>(
     context: context,
     useRootNavigator: true,
     barrierDismissible: false,
@@ -108,11 +120,13 @@ Future<void> runDeviceRestoreFlow(BuildContext context, WidgetRef ref) async {
 
   final service = DeviceBackupService();
   final api = ref.read(kiamiApiClientProvider);
+  File? appsZipFile;
 
   Future<void> closeProgress() async {
     if (!progressVisible) return;
     progressVisible = false;
-    await _popRootDialog(context);
+    progressClosed = true;
+    await _dismissRootDialog(context, progressDialogFuture);
     progressNotifier.dispose();
   }
 
@@ -130,66 +144,60 @@ Future<void> runDeviceRestoreFlow(BuildContext context, WidgetRef ref) async {
     }
 
     List<int>? contactsBytes;
-    List<int>? appsBytes;
 
     if (selected.hasContacts) {
-      progressNotifier.value = const DeviceBackupProgress(
-        fraction: 0.02,
-        label: KiamiStrings.deviceRestoreDownloadingContacts,
-      );
+      if (!progressClosed) {
+        progressNotifier.value = const DeviceBackupProgress(
+          fraction: 0.02,
+          label: KiamiStrings.deviceRestoreDownloadingContacts,
+        );
+      }
       contactsBytes = await api.downloadFileBytes(selected.contactsFile!.id);
     }
     if (selected.hasApps) {
-      progressNotifier.value = DeviceBackupProgress(
-        fraction: selected.hasContacts ? 0.08 : 0.02,
-        label: KiamiStrings.deviceRestoreDownloadingApps,
+      if (!progressClosed) {
+        progressNotifier.value = DeviceBackupProgress(
+          fraction: selected.hasContacts ? 0.08 : 0.02,
+          label: KiamiStrings.deviceRestoreDownloadingApps,
+        );
+      }
+      final appsBytes = await api.downloadFileBytes(selected.appsFile!.id);
+      final tmp = await getTemporaryDirectory();
+      appsZipFile = File(
+        p.join(tmp.path, 'kiami_restore_apps_${selected.stamp}.zip'),
       );
-      appsBytes = await api.downloadFileBytes(selected.appsFile!.id);
+      await appsZipFile.writeAsBytes(appsBytes, flush: true);
     }
 
     final result = await service.restore(
       scope: scope,
       contactsBytes: contactsBytes,
-      appsBytes: appsBytes,
+      appsZipFile: appsZipFile,
       onProgress: (p) {
-        if (!progressVisible) return;
+        if (progressClosed) return;
         progressNotifier.value = p;
       },
       onBeforeApkInstall: (current, total) async {
         if (!context.mounted) return;
-        if (current > 1) {
-          await showDialog<void>(
-            context: context,
-            barrierDismissible: false,
-            builder: (ctx) => AlertDialog(
-              title: Text(KiamiStrings.deviceRestoreApkContinueTitle),
-              content: Text(
-                KiamiStrings.deviceRestoreApkContinueBody(current, total),
+        await showDialog<void>(
+          context: context,
+          useRootNavigator: true,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: Text(KiamiStrings.deviceRestoreApkContinueTitle),
+            content: Text(
+              current > 1
+                  ? KiamiStrings.deviceRestoreApkContinueBody(current, total)
+                  : KiamiStrings.deviceRestoreApkFirstBody(total),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(KiamiStrings.deviceRestoreApkContinue),
               ),
-              actions: [
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text(KiamiStrings.deviceRestoreApkContinue),
-                ),
-              ],
-            ),
-          );
-        } else if (selected.hasApps) {
-          await showDialog<void>(
-            context: context,
-            barrierDismissible: false,
-            builder: (ctx) => AlertDialog(
-              title: Text(KiamiStrings.deviceRestoreApkContinueTitle),
-              content: Text(KiamiStrings.deviceRestoreApkFirstBody(total)),
-              actions: [
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text(KiamiStrings.deviceRestoreApkContinue),
-                ),
-              ],
-            ),
-          );
-        }
+            ],
+          ),
+        );
       },
     );
 
@@ -225,6 +233,15 @@ Future<void> runDeviceRestoreFlow(BuildContext context, WidgetRef ref) async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(KiamiStrings.deviceRestoreFailed(e.toString()))),
     );
+  } finally {
+    final zip = appsZipFile;
+    if (zip != null && await zip.exists()) {
+      try {
+        await zip.delete();
+      } catch (_) {
+        // Ignora falha ao limpar ficheiro temporário.
+      }
+    }
   }
 }
 

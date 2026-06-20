@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../constants/kiami_strings.dart';
+import '../../widgets/kiami_unavailable.dart';
+import '../connectivity/connectivity_provider.dart';
+import '../files/providers/files_providers.dart';
 import 'providers/account_activity_providers.dart';
 import 'widgets/account_notifications_panel.dart';
 
@@ -43,9 +46,16 @@ Future<void> showAccountNotificationsPopup(
 class _AccountNotificationsDialog extends ConsumerWidget {
   const _AccountNotificationsDialog();
 
+  void _close(BuildContext context) => Navigator.pop(context);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activityAsync = ref.watch(accountActivityProvider);
+    final isOnline = ref.watch(isOnlineProvider).valueOrNull ?? true;
+
+    if (!isOnline) {
+      return _issueDialog(context, const KiamiNoConnectCard(compact: true));
+    }
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -55,73 +65,81 @@ class _AccountNotificationsDialog extends ConsumerWidget {
           data: (activity) {
             final events = planNotificationEvents(activity.events);
             if (events.isEmpty) {
-              return _EmptyNotificationsBody(onClose: () => Navigator.pop(context));
+              return _NotificationsDialogShell(
+                onClose: () => _close(context),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  child: Text(
+                    KiamiStrings.notificationsEmpty,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ),
+              );
             }
-            return _NotificationsBody(onClose: () => Navigator.pop(context));
+            return _NotificationsDialogShell(
+              onClose: () => _close(context),
+              child: const AccountNotificationsPanel(),
+            );
           },
-          loading: () => _EmptyNotificationsBody(
-            onClose: () => Navigator.pop(context),
-            loading: true,
+          loading: () => _NotificationsDialogShell(
+            onClose: () => _close(context),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(child: CircularProgressIndicator()),
+            ),
           ),
-          error: (_, __) => _NotificationsBody(onClose: () => Navigator.pop(context)),
+          error: (error, _) => _issueDialog(
+            context,
+            kiamiApiErrorIsConnection(error)
+                ? const KiamiNoConnectCard(compact: true)
+                : const KiamiUnavailableCard(compact: true),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _issueDialog(BuildContext context, Widget imageCard) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  onPressed: () => _close(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+              imageCard,
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _EmptyNotificationsBody extends StatelessWidget {
-  const _EmptyNotificationsBody({
+class _NotificationsDialogShell extends StatelessWidget {
+  const _NotificationsDialogShell({
     required this.onClose,
-    this.loading = false,
+    required this.child,
   });
 
   final VoidCallback onClose;
-  final bool loading;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Align(
-            alignment: Alignment.topRight,
-            child: IconButton(
-              onPressed: onClose,
-              icon: const Icon(Icons.close),
-            ),
-          ),
-          if (loading)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 32),
-              child: CircularProgressIndicator(),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-              child: Text(
-                KiamiStrings.notificationsEmpty,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NotificationsBody extends StatelessWidget {
-  const _NotificationsBody({required this.onClose});
-
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 12, 20),
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -142,12 +160,8 @@ class _NotificationsBody extends StatelessWidget {
               ),
             ],
           ),
-          Text(
-            KiamiStrings.notificationsHint,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
-          const AccountNotificationsPanel(),
+          const SizedBox(height: 8),
+          child,
         ],
       ),
     );

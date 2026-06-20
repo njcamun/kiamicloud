@@ -7,6 +7,7 @@ import '../../constants/kiami_strings.dart';
 import '../../utils/file_category.dart';
 import '../../utils/kiami_layout.dart';
 import '../../widgets/file_list_toolbar.dart';
+import '../../widgets/kiami_api_unavailable_card.dart';
 import '../../widgets/kiami_category_banner.dart';
 import '../../widgets/kiami_empty_state.dart';
 import '../../widgets/kiami_file_detail_tile.dart';
@@ -18,6 +19,7 @@ import '../../widgets/kiami_search_bar.dart';
 import '../files/presentation/file_list_actions.dart';
 import '../files/presentation/file_list_sort.dart';
 import '../files/providers/files_providers.dart';
+import '../connectivity/connectivity_provider.dart';
 import '../photos/presentation/photo_album_dialogs.dart';
 import '../photos/presentation/photos_grouped_sliver.dart';
 import '../photos/providers/photo_library_providers.dart';
@@ -193,6 +195,7 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
     ref.watch(photoLibraryProvider);
     final hPad = kiamiContentHorizontalPadding(context);
     final showBack = kiamiShowsShellBackButton(context);
+    final canDownload = ref.watch(isOnlineProvider).valueOrNull ?? true;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -386,7 +389,7 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                         ),
                       )
                     else
-                      _buildFilesSliver(files, contentWidth, hPad),
+                      _buildFilesSliver(files, contentWidth, hPad, canDownload),
                     SliverToBoxAdapter(
                       child: SizedBox(
                         height: kiamiBottomInset(context, 8),
@@ -407,19 +410,10 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: kiamiScrollPadding(context, left: hPad, right: hPad),
                 children: [
-                  const SizedBox(height: 48),
-                  Text(
-                    kiamiApiErrorMessage(e),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: FilledButton.icon(
-                      onPressed: refreshKiamiFiles,
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Tentar novamente'),
-                    ),
+                  const SizedBox(height: 24),
+                  KiamiApiUnavailableCard(
+                    error: e,
+                    onRetry: refreshKiamiFiles,
                   ),
                 ],
               ),
@@ -436,6 +430,7 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
     List<KiamiFile> files,
     double width,
     double hPad,
+    bool canDownload,
   ) {
     if (widget.category == KiamiFileCategory.images) {
       return _buildPhotosSliver(files, width, hPad);
@@ -464,6 +459,7 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                   onDownload: actions.onDownload,
                   onRename: actions.onRename,
                   onDelete: actions.onDelete,
+                  canDownload: canDownload,
                 );
               },
               childCount: files.length,
@@ -493,6 +489,7 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                   onDownload: actions.onDownload,
                   onRename: actions.onRename,
                   onDelete: actions.onDelete,
+                  canDownload: canDownload,
                 );
               },
               childCount: files.length,
@@ -516,6 +513,7 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                   onDownload: actions.onDownload,
                   onRename: actions.onRename,
                   onDelete: actions.onDelete,
+                  canDownload: canDownload,
                 );
               },
               childCount: files.length,

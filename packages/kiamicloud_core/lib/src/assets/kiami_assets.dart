@@ -20,6 +20,15 @@ abstract final class KiamiAssets {
   /// Splash — ficheiro `splashpage.png` (único).
   static const String splashpage = '$_base/splashpage.png';
 
+  /// Ilustração quando não há ligação à internet ou à cloud.
+  static const String noConnectPng = '$_base/NoConnect.png';
+
+  /// Ilustração quando a ligação ao servidor foi confirmada (teste OK).
+  static const String connectPng = '$_base/Connect.png';
+
+  /// Ilustração quando um ficheiro específico não está acessível (rede OK).
+  static const String unavailablePng = '$_base/unavailable.png';
+
   @Deprecated('Use KiamiAssets.splashpage')
   static const String splashPagePng = splashpage;
 

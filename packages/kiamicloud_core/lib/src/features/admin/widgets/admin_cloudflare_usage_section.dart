@@ -6,6 +6,7 @@ import '../../../constants/kiami_strings.dart';
 import '../../../theme/kiami_colors.dart';
 import '../../../utils/format_bytes.dart';
 import '../../../utils/format_compact_number.dart';
+import '../../../widgets/kiami_unavailable.dart';
 import '../../files/providers/files_providers.dart';
 import '../providers/admin_providers.dart';
 
@@ -31,30 +32,36 @@ class AdminCloudflareUsageSection extends ConsumerWidget {
           const Center(child: CircularProgressIndicator()),
         ],
       ),
-      error: (e, _) => Card(
-        color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.5),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                KiamiStrings.adminCfUsageTitle,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(kiamiApiErrorMessage(e)),
-              const SizedBox(height: 8),
-              Text(
-                KiamiStrings.adminCfLoadHint,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
+      error: (e, _) {
+        if (kiamiApiErrorIsConnection(e)) {
+          return const KiamiNoConnectCard(compact: true);
+        }
+
+        return Card(
+          color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.5),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  KiamiStrings.adminCfUsageTitle,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(kiamiApiErrorMessage(e)),
+                const SizedBox(height: 8),
+                Text(
+                  KiamiStrings.adminCfLoadHint,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

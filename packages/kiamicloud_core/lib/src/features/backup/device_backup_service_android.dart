@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:archive/archive.dart';
+import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:path/path.dart' as p;
@@ -86,61 +86,103 @@ class DeviceBackupService {
       );
     }
 
-    if (doContacts) {
-      report('A exportar contactos…', 0.1);
-      final vcf = await _exportContactsVcf(onSubProgress: (p) {
-        report('A exportar contactos…', p * 0.9);
-      });
-      report('A enviar contactos…', 0.92);
-      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-      await upload('kiami-backup-contacts-$stamp.vcf', vcf);
-      step += 1;
-      report('Contactos concluídos', 1.0);
-    }
+    File? contactsFile;
+    File? appsZipFile;
 
-    if (doApps) {
-      report('A preparar lista de apps…', 0.05);
-      final zipBytes = await _exportAppsZip(onSubProgress: (p) {
-        report('A empacotar apps…', p * 0.85);
-      });
-      report('A enviar apps…', 0.92);
-      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-      await upload('kiami-backup-apps-$stamp.zip', zipBytes);
-      step += 1;
-      onProgress(
-        const DeviceBackupProgress(fraction: 1.0, label: 'Back-up concluído'),
-      );
+    try {
+      if (doContacts) {
+        report('A exportar contactos…', 0.1);
+        contactsFile = await _exportContactsVcfToFile(
+          onSubProgress: (p) => report('A exportar contactos…', p * 0.9),
+        );
+        report('A enviar contactos…', 0.92);
+        final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+        await upload(
+          'kiami-backup-contacts-$stamp.vcf',
+          contactsFile,
+          'text/vcard',
+        );
+        step += 1;
+        report('Contactos concluídos', 1.0);
+      }
+
+      if (doApps) {
+        report('A preparar lista de apps…', 0.05);
+        appsZipFile = await _exportAppsZipToFile(
+          onSubProgress: (p) => report('A empacotar apps…', p * 0.85),
+        );
+        report('A enviar apps…', 0.92);
+        final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+        await upload(
+          'kiami-backup-apps-$stamp.zip',
+          appsZipFile,
+          'application/zip',
+        );
+        step += 1;
+        onProgress(
+          const DeviceBackupProgress(fraction: 1.0, label: 'Back-up concluído'),
+        );
+      }
+    } finally {
+      await _deleteTempFile(contactsFile);
+      await _deleteTempFile(appsZipFile);
     }
   }
 
-  Future<List<int>> _exportContactsVcf({
+  Future<void> _deleteTempFile(File? file) async {
+    if (file == null) return;
+    try {
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Ignora falha ao limpar ficheiro temporário.
+    }
+  }
+
+  Future<File> _exportContactsVcfToFile({
     required void Function(double) onSubProgress,
   }) async {
     final contacts = await FlutterContacts.getContacts(
       withProperties: true,
       withPhoto: false,
     );
-    final buffer = StringBuffer();
+    final tmp = await getTemporaryDirectory();
+    final out = File(
+      p.join(
+        tmp.path,
+        'kiami_backup_contacts_${DateTime.now().millisecondsSinceEpoch}.vcf',
+      ),
+    );
+    final sink = out.openWrite(encoding: utf8);
     final total = contacts.length;
     for (var i = 0; i < total; i++) {
-      buffer.writeln(contacts[i].toVCard());
-      if (total > 0 && i % 10 == 0) {
+      sink.writeln(contacts[i].toVCard());
+      if (total > 0 && (i % 10 == 0 || i == total - 1)) {
         onSubProgress((i + 1) / total);
       }
     }
+    await sink.flush();
+    await sink.close();
     onSubProgress(1.0);
-    return utf8.encode(buffer.toString());
+    return out;
   }
 
-  Future<List<int>> _exportAppsZip({
+  Future<File> _exportAppsZipToFile({
     required void Function(double) onSubProgress,
   }) async {
     final apps = await DeviceBackupChannel.listUserApps();
+    final tmp = await getTemporaryDirectory();
+    final zipPath = p.join(
+      tmp.path,
+      'kiami_backup_apps_${DateTime.now().millisecondsSinceEpoch}.zip',
+    );
 
     final manifest = <Map<String, dynamic>>[];
-    final archive = Archive();
-    final total = apps.length;
+    final encoder = ZipFileEncoder();
+    encoder.create(zipPath);
 
+    final total = apps.length;
     for (var i = 0; i < total; i++) {
       final app = apps[i];
       manifest.add({
@@ -157,12 +199,9 @@ class DeviceBackupService {
       if (apkPath != null && apkPath.isNotEmpty) {
         final file = File(apkPath);
         if (await file.exists()) {
-          final bytes = await file.readAsBytes();
           final packageName = app['packageName'] as String? ?? 'app';
           final safeName = packageName.replaceAll('.', '_');
-          archive.addFile(
-            ArchiveFile('apks/$safeName.apk', bytes.length, bytes),
-          );
+          await encoder.addFile(file, 'apks/$safeName.apk');
         }
       }
 
@@ -172,21 +211,22 @@ class DeviceBackupService {
     }
 
     final manifestBytes = utf8.encode(jsonEncode(manifest));
-    archive.addFile(
+    encoder.addArchiveFile(
       ArchiveFile('apps.json', manifestBytes.length, manifestBytes),
     );
+    await encoder.close();
 
-    final zip = ZipEncoder().encode(archive);
-    if (zip.isEmpty) {
+    final zipFile = File(zipPath);
+    if (!await zipFile.exists() || await zipFile.length() == 0) {
       throw StateError('Falha ao criar ficheiro ZIP de apps.');
     }
-    return zip;
+    return zipFile;
   }
 
   Future<DeviceRestoreResult> restore({
     required DeviceBackupScope scope,
     List<int>? contactsBytes,
-    List<int>? appsBytes,
+    File? appsZipFile,
     required void Function(DeviceBackupProgress progress) onProgress,
     Future<void> Function(int current, int total)? onBeforeApkInstall,
   }) async {
@@ -199,7 +239,7 @@ class DeviceBackupService {
             contactsBytes != null;
     final doApps =
         (scope == DeviceBackupScope.apps || scope == DeviceBackupScope.both) &&
-            appsBytes != null;
+            appsZipFile != null;
 
     var step = 0;
     final totalSteps = (doContacts ? 1 : 0) + (doApps ? 1 : 0);
@@ -231,10 +271,10 @@ class DeviceBackupService {
     }
 
     if (doApps) {
-      final bytes = appsBytes;
+      final zipFile = appsZipFile;
       report('A preparar apps…', 0.05);
-      apksQueued = await _restoreAppsZip(
-        bytes,
+      apksQueued = await _restoreAppsZipFromFile(
+        zipFile,
         onSubProgress: (p) => report('A preparar apps…', p * 0.4),
         onBeforeInstall: onBeforeApkInstall,
         onInstallProgress: (current, total) {
@@ -293,13 +333,16 @@ class DeviceBackupService {
     return contacts;
   }
 
-  Future<int> _restoreAppsZip(
-    List<int> bytes, {
+  Future<int> _restoreAppsZipFromFile(
+    File zipFile, {
     required void Function(double) onSubProgress,
     required void Function(int current, int total) onInstallProgress,
     Future<void> Function(int current, int total)? onBeforeInstall,
   }) async {
-    final archive = ZipDecoder().decodeBytes(bytes);
+    if (!await zipFile.exists()) {
+      throw StateError('Ficheiro ZIP de apps não encontrado.');
+    }
+
     final tmp = await getTemporaryDirectory();
     final installDir = Directory(p.join(tmp.path, 'apk_install'));
     if (await installDir.exists()) {
@@ -307,24 +350,22 @@ class DeviceBackupService {
     }
     await installDir.create(recursive: true);
 
-    final apkFiles = <File>[];
-    final entries = archive.where(
-      (f) =>
-          f.isFile &&
-          f.name.startsWith('apks/') &&
-          f.name.toLowerCase().endsWith('.apk'),
-    ).toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    onSubProgress(0.1);
+    await extractFileToDisk(zipFile.path, installDir.path);
+    onSubProgress(1.0);
 
-    for (var i = 0; i < entries.length; i++) {
-      final entry = entries[i];
-      final out = File(p.join(installDir.path, p.basename(entry.name)));
-      await out.writeAsBytes(entry.content, flush: true);
-      apkFiles.add(out);
-      if (entries.isNotEmpty) {
-        onSubProgress((i + 1) / entries.length);
+    final apksDir = Directory(p.join(installDir.path, 'apks'));
+    if (!await apksDir.exists()) {
+      throw StateError('Nenhum APK encontrado no ficheiro de back-up.');
+    }
+
+    final apkFiles = <File>[];
+    await for (final entity in apksDir.list(followLinks: false)) {
+      if (entity is File && entity.path.toLowerCase().endsWith('.apk')) {
+        apkFiles.add(entity);
       }
     }
+    apkFiles.sort((a, b) => a.path.compareTo(b.path));
 
     if (apkFiles.isEmpty) {
       throw StateError('Nenhum APK encontrado no ficheiro de back-up.');

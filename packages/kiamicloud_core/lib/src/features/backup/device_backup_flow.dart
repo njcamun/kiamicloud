@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,22 +7,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../constants/kiami_strings.dart';
 import '../../utils/kiami_platform.dart';
 import '../files/providers/files_providers.dart';
+import 'device_backup_access.dart';
 import 'device_backup_service.dart';
 
 /// Fecha o diálogo no root navigator sem rebentar `!_debugLocked`.
-Future<void> _popRootDialog(BuildContext context) async {
-  if (!context.mounted) return;
-  await SchedulerBinding.instance.endOfFrame;
+Future<void> _dismissRootDialog(
+  BuildContext context,
+  Future<void>? dialogFuture,
+) async {
   if (!context.mounted) return;
   final navigator = Navigator.of(context, rootNavigator: true);
   if (navigator.canPop()) {
     navigator.pop();
+  }
+  if (dialogFuture != null) {
+    await dialogFuture;
   }
 }
 
 /// Inicia o fluxo de back-up (Android apenas).
 Future<void> runDeviceBackupFlow(BuildContext context, WidgetRef ref) async {
   if (!kiamiDeviceBackupSupported()) return;
+  if (!await ensureDeviceBackupPlanAccess(context, ref)) return;
+  if (!context.mounted) return;
 
   final waitOk = await showDialog<bool>(
     context: context,
@@ -56,14 +65,14 @@ Future<void> runDeviceBackupFlow(BuildContext context, WidgetRef ref) async {
   );
 
   var progressVisible = false;
+  var progressClosed = false;
   if (!context.mounted) {
     progressNotifier.dispose();
     return;
   }
 
   progressVisible = true;
-  // Não await — o diálogo fica aberto durante o back-up.
-  showDialog<void>(
+  final progressDialogFuture = showDialog<void>(
     context: context,
     useRootNavigator: true,
     barrierDismissible: false,
@@ -77,7 +86,8 @@ Future<void> runDeviceBackupFlow(BuildContext context, WidgetRef ref) async {
   Future<void> closeProgress() async {
     if (!progressVisible) return;
     progressVisible = false;
-    await _popRootDialog(context);
+    progressClosed = true;
+    await _dismissRootDialog(context, progressDialogFuture);
     progressNotifier.dispose();
   }
 
@@ -95,11 +105,17 @@ Future<void> runDeviceBackupFlow(BuildContext context, WidgetRef ref) async {
     await service.run(
       scope: scope,
       onProgress: (p) {
-        if (!progressVisible) return;
+        if (progressClosed) return;
         progressNotifier.value = p;
       },
-      upload: (name, bytes) async {
-        await api.uploadFile(name: name, bytes: bytes);
+      upload: (name, file, mimeType) async {
+        final backupFile = file as File;
+        await api.uploadFilePath(
+          name: name,
+          filePath: backupFile.path,
+          sizeBytes: await backupFile.length(),
+          mimeType: mimeType,
+        );
       },
     );
 
