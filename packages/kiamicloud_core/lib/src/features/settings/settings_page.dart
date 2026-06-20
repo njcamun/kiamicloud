@@ -94,12 +94,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 child: Column(
                   children: [
                     _SettingsNavTile(
-                      icon: Icons.link_outlined,
-                      title: KiamiStrings.settingsShares,
-                      onTap: () => context.push(KiamiRoutes.shares),
-                      dense: true,
-                    ),
-                    _SettingsNavTile(
                       icon: Icons.gavel_outlined,
                       title: KiamiStrings.settingsLegal,
                       onTap: () =>

@@ -44,7 +44,6 @@ abstract final class KiamiApiLimits {
       access: const KiamiSubscriptionAccess(
         canUpload: true,
         canDownload: true,
-        canShare: true,
         status: 'active',
         effectiveStatus: 'active',
       ),

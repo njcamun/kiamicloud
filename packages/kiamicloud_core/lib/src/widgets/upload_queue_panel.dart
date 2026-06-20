@@ -5,7 +5,7 @@ import '../constants/kiami_strings.dart';
 import '../features/upload/upload_queue.dart';
 import '../utils/format_bytes.dart';
 
-/// Painel compacto da fila de uploads.
+/// Painel compacto da fila de uploads com barra de progresso por ficheiro.
 class UploadQueuePanel extends ConsumerWidget {
   const UploadQueuePanel({super.key});
 
@@ -48,25 +48,46 @@ class UploadQueuePanel extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               ...queue.items.take(6).map((item) {
+                final isUploading =
+                    item.status == UploadQueueItemStatus.uploading;
+                final percent = (item.progress * 100).round().clamp(0, 100);
+
                 return ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
-                  leading: _statusIcon(item.status),
+                  leading: _statusIcon(item.status, item.progress),
                   title: Text(
                     item.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  subtitle: Text(
-                    item.errorMessage ??
-                        formatBytes(item.sizeBytes),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: item.status == UploadQueueItemStatus.failed
-                          ? scheme.error
-                          : scheme.onSurfaceVariant,
-                    ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        item.errorMessage ??
+                            (isUploading
+                                ? KiamiStrings.uploadProgressPercent(percent)
+                                : formatBytes(item.sizeBytes)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: item.status == UploadQueueItemStatus.failed
+                              ? scheme.error
+                              : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      if (isUploading) ...[
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            minHeight: 5,
+                            value: item.progress.clamp(0.0, 1.0),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   trailing: item.status == UploadQueueItemStatus.failed
                       ? IconButton(
@@ -93,13 +114,16 @@ class UploadQueuePanel extends ConsumerWidget {
     );
   }
 
-  Widget _statusIcon(UploadQueueItemStatus status) {
+  Widget _statusIcon(UploadQueueItemStatus status, double progress) {
     return switch (status) {
       UploadQueueItemStatus.pending => const Icon(Icons.schedule_rounded),
-      UploadQueueItemStatus.uploading => const SizedBox(
+      UploadQueueItemStatus.uploading => SizedBox(
           width: 20,
           height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            value: progress > 0 ? progress.clamp(0.05, 1.0) : null,
+          ),
         ),
       UploadQueueItemStatus.completed =>
         const Icon(Icons.check_circle_outline, color: Colors.green),

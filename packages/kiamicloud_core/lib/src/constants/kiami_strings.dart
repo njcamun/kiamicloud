@@ -128,11 +128,6 @@ abstract final class KiamiStrings {
       'Faça upgrade para mais armazenamento.';
   static const String settingsBilling = 'Planos e pagamentos';
   static const String settingsPrivacySection = 'Privacidade e conta';
-  static const String settingsExportData = 'Exportar os meus dados';
-  static const String settingsExportDataHint =
-      'Descarrega um JSON com perfil, ficheiros e actividade.';
-  static const String settingsExportSuccess = 'Exportação guardada.';
-  static const String settingsExportError = 'Não foi possível exportar os dados.';
   static const String settingsTerms = 'Termos de utilização';
   static const String settingsPrivacy = 'Política de privacidade';
   static const String settingsLegal = 'Legal';
@@ -165,6 +160,30 @@ abstract final class KiamiStrings {
   static const String galleryNoPreview =
       'Pré-visualização não disponível para este tipo de ficheiro.';
   static String galleryPosition(int current, int total) => '$current / $total';
+  static const String photosToday = 'Hoje';
+  static const String photosYesterday = 'Ontem';
+  static const String photosFilterAll = 'Todas';
+  static const String photosFilterFavorites = 'Favoritas';
+  static const String photoFavoriteToggle = 'Favorito';
+  static const String photoAlbumCreateTitle = 'Novo álbum';
+  static const String photoAlbumNameLabel = 'Nome do álbum';
+  static const String photoAlbumCreateAction = 'Criar álbum';
+  static const String photoAlbumEmpty = 'Ainda não tem álbuns. Crie um para organizar fotos.';
+  static const String photoAddToAlbumTitle = 'Adicionar a álbum';
+  static const String photoLibraryLoadError = 'Não foi possível carregar a biblioteca de fotos.';
+  static const String photoAdjustTitle = 'Ajuste rápido';
+  static const String photoAdjustHint = 'Brilho da imagem (pré-visualização local).';
+  static const String photoAdjustApply = 'Aplicar';
+  static const String photoGalleryFavorite = 'Favorito';
+  static const String photoGalleryAddTo = 'Adicionar';
+  static const String photoGalleryDelete = 'Remover';
+  static const String photoGalleryAdjust = 'Ajuste';
+  static const String photoSelectionCreateAlbum = 'Criar álbum';
+  static String photoAlbumCreateHint(int count) =>
+      count == 1 ? '1 foto seleccionada' : '$count fotos seleccionadas';
+  static String photoAlbumPhotoCount(int count) =>
+      count == 1 ? '1 foto' : '$count fotos';
+  static String photoAddedToAlbum(String name) => 'Adicionado a «$name».';
   static const String quotaBannerUpgradeHint = 'Toque para ver planos';
   static const String billingUpgradeSuccessAction = 'Ver armazenamento';
   static const String settingsAudit = 'Actividade recente';
@@ -266,6 +285,8 @@ abstract final class KiamiStrings {
   static const String uploadInProgress = 'A enviar…';
   static String uploadInProgressCount(int current, int total) =>
       'A enviar $current de $total…';
+  static String uploadProgressPercent(int percent) =>
+      'A enviar… $percent%';
   static const String uploadSuccess = 'Ficheiro enviado com sucesso.';
   static String uploadSuccessMultiple(int count) => count == 1
       ? uploadSuccess
@@ -289,24 +310,11 @@ abstract final class KiamiStrings {
   static const String downloadButton = 'Descarregar';
   static const String downloadSaved = 'Ficheiro guardado.';
   static const String fileRename = 'Renomear';
-  static const String fileShare = 'Partilhar link';
-  static const String fileShareCreated =
-      'Link de partilha copiado (válido 7 dias).';
-  static const String fileShareError =
-      'Não foi possível criar o link de partilha.';
-  static const String sharesTitle = 'Links partilhados';
-  static const String sharesEmpty = 'Nenhum link de partilha activo.';
-  static const String sharesRevoke = 'Revogar';
-  static const String sharesRevoked = 'Link revogado.';
-  static const String sharesAccessCount = 'acessos';
-  static const String sharesExpired = 'Expirado';
-  static const String sharesActive = 'Activo';
   static const String offlineDeleteQueued =
       'Sem rede — apagar enfileirado. Sincroniza ao reconectar.';
   static const String offlineRenameQueued =
       'Sem rede — renomear enfileirado. Sincroniza ao reconectar.';
   static const String offlineSyncDone = 'Alterações offline sincronizadas.';
-  static const String settingsShares = 'Links partilhados';
   static const String fileDelete = 'Apagar';
   static const String fileRenameTitle = 'Novo nome';
   static const String fileDeleteTitle = 'Apagar ficheiro?';
@@ -334,6 +342,17 @@ abstract final class KiamiStrings {
   static String uploadBackgroundStarted(int n) => n == 1
       ? '1 ficheiro na fila. O envio continua em segundo plano — avisamos quando terminar.'
       : '$n ficheiros na fila. Os envios continuam em segundo plano — avisamos quando terminar.';
+  static const String uploadPreparing = 'A preparar envio…';
+  static const String uploadProfileLoading =
+      'A carregar o perfil… Aguarde um momento.';
+  static const String uploadNothingEnqueued =
+      'Não foi possível enviar os ficheiros seleccionados. Tente outro ficheiro.';
+  static const String pwaInstallTitle = 'Instalar KiamiCloud';
+  static const String pwaInstallAction = 'Instalar app';
+  static const String pwaInstallAndroidBody =
+      'Adicione ao ecrã inicial para acesso rápido, como uma app nativa.';
+  static const String pwaInstallIosBody =
+      'Toque em Partilhar (↑) e escolha «Adicionar ao ecrã inicial».';
   static String uploadBackgroundComplete(int ok, int failed) {
     if (failed == 0) {
       return ok == 1
@@ -359,7 +378,8 @@ abstract final class KiamiStrings {
           'e que o dispositivo está na mesma rede Wi‑Fi.';
     }
     return 'Não conseguimos falar com $baseUrl.\n'
-        'Pode ser uma falha temporária na cloud — tente de novo dentro de momentos.';
+        'Verifique Wi‑Fi ou dados móveis e tente de novo. '
+        'Abra o site em Chrome (https://kiamicloud.web.app), não numa app interna.';
   }
   static const String apiUnavailableTimeout =
       'O servidor demorou demasiado a responder. Tente novamente.';

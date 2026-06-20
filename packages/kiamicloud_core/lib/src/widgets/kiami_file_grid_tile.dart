@@ -14,7 +14,6 @@ class KiamiFileGridTile extends StatelessWidget {
     required this.onDownload,
     required this.onRename,
     required this.onDelete,
-    required this.onShare,
     this.onOpen,
   });
 
@@ -22,7 +21,6 @@ class KiamiFileGridTile extends StatelessWidget {
   final VoidCallback onDownload;
   final VoidCallback onRename;
   final VoidCallback onDelete;
-  final VoidCallback onShare;
   final VoidCallback? onOpen;
 
   @override
@@ -52,7 +50,6 @@ class KiamiFileGridTile extends StatelessWidget {
                     onDownload: onDownload,
                     onRename: onRename,
                     onDelete: onDelete,
-                    onShare: onShare,
                     iconSize: 20,
                   ),
                 ),

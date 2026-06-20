@@ -210,30 +210,41 @@ adminRoutes.patch('/users/:uid', async (c) => {
     );
   }
 
-  const result = await updateUserByAdmin(c.env.DB, {
-    targetUid: c.req.param('uid'),
-    adminUid: admin.uid,
-    environment: c.env.ENVIRONMENT,
-    planCode: hasPlan ? body.planCode!.trim() : undefined,
-    quotaBytesOverride: hasQuota ? body.quotaBytesOverride : undefined,
-    clearQuotaOverride: clearQuota,
-    maxFileSizeBytesOverride: hasOverride
-      ? body.maxFileSizeBytesOverride
-      : undefined,
-    clearTransferOverride: clearOverride,
-    canSwitchApiEndpoint: hasSwitch ? body.canSwitchApiEndpoint === true : undefined,
-  });
+  try {
+    const result = await updateUserByAdmin(c.env.DB, {
+      targetUid: c.req.param('uid'),
+      adminUid: admin.uid,
+      environment: c.env.ENVIRONMENT,
+      planCode: hasPlan ? body.planCode!.trim() : undefined,
+      quotaBytesOverride: hasQuota ? body.quotaBytesOverride : undefined,
+      clearQuotaOverride: clearQuota,
+      maxFileSizeBytesOverride: hasOverride
+        ? body.maxFileSizeBytesOverride
+        : undefined,
+      clearTransferOverride: clearOverride,
+      canSwitchApiEndpoint: hasSwitch ? body.canSwitchApiEndpoint === true : undefined,
+    });
 
-  if ('error' in result) {
-    console.warn(
-      '[admin] PATCH /users/%s failed: %s',
-      c.req.param('uid'),
-      result.error,
+    if ('error' in result) {
+      console.warn(
+        '[admin] PATCH /users/%s failed: %s',
+        c.req.param('uid'),
+        result.error,
+      );
+      return c.json({ error: 'update_failed', message: result.error }, 400);
+    }
+
+    return c.json({ user: result.user, message: 'Utilizador actualizado.' });
+  } catch (err) {
+    console.error('[admin] PATCH /users/%s internal error:', c.req.param('uid'), err);
+    return c.json(
+      {
+        error: 'internal_error',
+        message: 'Erro interno ao actualizar utilizador. Tente novamente.',
+      },
+      500,
     );
-    return c.json({ error: 'update_failed', message: result.error }, 400);
   }
-
-  return c.json({ user: result.user, message: 'Utilizador actualizado.' });
 });
 
 /** Feed de actividade (upload, download, etc.) — consola Blade. */

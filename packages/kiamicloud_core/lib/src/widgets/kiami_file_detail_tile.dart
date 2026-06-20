@@ -16,7 +16,6 @@ class KiamiFileDetailTile extends StatelessWidget {
     required this.onDownload,
     required this.onRename,
     required this.onDelete,
-    required this.onShare,
     this.onOpen,
   });
 
@@ -24,7 +23,6 @@ class KiamiFileDetailTile extends StatelessWidget {
   final VoidCallback onDownload;
   final VoidCallback onRename;
   final VoidCallback onDelete;
-  final VoidCallback onShare;
   final VoidCallback? onOpen;
 
   @override
@@ -90,7 +88,6 @@ class KiamiFileDetailTile extends StatelessWidget {
             onDownload: onDownload,
             onRename: onRename,
             onDelete: onDelete,
-            onShare: onShare,
           ),
         ],
       ),

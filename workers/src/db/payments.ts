@@ -123,23 +123,49 @@ export async function switchUserPlan(
     }
   }
 
-  await db
-    .prepare(
-      `UPDATE users SET plan_code = ?, updated_at = datetime('now') WHERE firebase_uid = ?`,
-    )
-    .bind(plan.code, input.firebaseUid)
-    .run();
+  const previousPlanCode = profile.plan_code;
 
-  await activateOrRenewSubscription(db, {
-    firebaseUid: input.firebaseUid,
-    planCode: plan.code,
-  });
+  try {
+    await activateOrRenewSubscription(db, {
+      firebaseUid: input.firebaseUid,
+      planCode: plan.code,
+    });
+  } catch (err) {
+    console.error('[payments] switchUserPlan subscription failed:', err);
+    return { error: 'Nao foi possivel activar a subscrição do plano.' };
+  }
 
-  await logSecurityEvent(db, {
-    eventType: 'plan_changed',
-    firebaseUid: input.firebaseUid,
-    metadata: { planCode: plan.code, source: 'direct_switch' },
-  });
+  try {
+    await db
+      .prepare(
+        `UPDATE users SET plan_code = ?, updated_at = datetime('now') WHERE firebase_uid = ?`,
+      )
+      .bind(plan.code, input.firebaseUid)
+      .run();
+  } catch (err) {
+    console.error('[payments] switchUserPlan UPDATE users failed:', err);
+    try {
+      await db
+        .prepare(
+          `UPDATE users SET plan_code = ?, updated_at = datetime('now') WHERE firebase_uid = ?`,
+        )
+        .bind(previousPlanCode, input.firebaseUid)
+        .run();
+    } catch (rollbackErr) {
+      console.error('[payments] switchUserPlan rollback failed:', rollbackErr);
+    }
+    return { error: 'Falha ao alterar plano.' };
+  }
+
+  try {
+    await logSecurityEvent(db, {
+      eventType: 'plan_changed',
+      firebaseUid: input.firebaseUid,
+      metadata: { planCode: plan.code, source: 'direct_switch' },
+    });
+  } catch (err) {
+    console.warn('[payments] switchUserPlan security log failed:', err);
+  }
 
   const updated = await getUserProfile(db, input.firebaseUid);
   if (!updated) return { error: 'Perfil nao encontrado apos alteracao.' };
@@ -370,6 +396,16 @@ export async function confirmCheckoutPayment(
   const plan = getPlanByCode(row.plan_code);
   if (!plan) return { ok: false, error: 'Plano do checkout invalido.' };
 
+  try {
+    await activateOrRenewSubscription(db, {
+      firebaseUid: row.firebase_uid,
+      planCode: row.plan_code,
+    });
+  } catch (err) {
+    console.error('[payments] confirmCheckout subscription failed:', err);
+    return { ok: false, error: 'Nao foi possivel activar a subscrição do plano.' };
+  }
+
   await db.batch([
     db
       .prepare(
@@ -387,22 +423,21 @@ export async function confirmCheckoutPayment(
       .bind(row.plan_code, row.firebase_uid),
   ]);
 
-  await activateOrRenewSubscription(db, {
-    firebaseUid: row.firebase_uid,
-    planCode: row.plan_code,
-  });
+  try {
+    await logSecurityEvent(db, {
+      eventType: 'checkout_paid',
+      firebaseUid: row.firebase_uid,
+      metadata: { planCode: row.plan_code, reference: row.reference },
+    });
 
-  await logSecurityEvent(db, {
-    eventType: 'checkout_paid',
-    firebaseUid: row.firebase_uid,
-    metadata: { planCode: row.plan_code, reference: row.reference },
-  });
-
-  await logSecurityEvent(db, {
-    eventType: 'plan_changed',
-    firebaseUid: row.firebase_uid,
-    metadata: { planCode: row.plan_code, source: 'payment' },
-  });
+    await logSecurityEvent(db, {
+      eventType: 'plan_changed',
+      firebaseUid: row.firebase_uid,
+      metadata: { planCode: row.plan_code, source: 'payment' },
+    });
+  } catch (err) {
+    console.warn('[payments] confirmCheckout security log failed:', err);
+  }
 
   const profileRow = await db
     .prepare(

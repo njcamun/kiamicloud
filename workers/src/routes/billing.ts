@@ -120,7 +120,6 @@ billingRoutes.get('/status', async (c) => {
     ? {
         canUpload: true,
         canDownload: true,
-        canShare: true,
         status: 'active',
         effectiveStatus: 'active',
         blockReason: null,

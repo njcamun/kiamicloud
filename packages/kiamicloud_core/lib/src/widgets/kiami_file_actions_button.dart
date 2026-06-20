@@ -12,7 +12,6 @@ class KiamiFileActionsButton extends StatelessWidget {
     required this.onDownload,
     required this.onRename,
     required this.onDelete,
-    this.onShare,
     this.iconSize = 22,
   });
 
@@ -20,7 +19,6 @@ class KiamiFileActionsButton extends StatelessWidget {
   final VoidCallback onDownload;
   final VoidCallback onRename;
   final VoidCallback onDelete;
-  final VoidCallback? onShare;
   final double iconSize;
 
   @override
@@ -32,8 +30,6 @@ class KiamiFileActionsButton extends StatelessWidget {
         switch (value) {
           case 'download':
             onDownload();
-          case 'share':
-            onShare?.call();
           case 'rename':
             onRename();
           case 'delete':
@@ -50,16 +46,6 @@ class KiamiFileActionsButton extends StatelessWidget {
             dense: true,
           ),
         ),
-        if (onShare != null)
-          const PopupMenuItem(
-            value: 'share',
-            child: ListTile(
-              leading: Icon(Icons.link_outlined),
-              title: Text(KiamiStrings.fileShare),
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-            ),
-          ),
         const PopupMenuItem(
           value: 'rename',
           child: ListTile(

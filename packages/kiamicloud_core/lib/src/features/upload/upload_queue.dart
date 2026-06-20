@@ -27,6 +27,7 @@ class UploadQueueItem {
     required this.status,
     this.errorMessage,
     this.attempts = 0,
+    this.progress = 0,
   });
 
   final String id;
@@ -39,12 +40,15 @@ class UploadQueueItem {
   final UploadQueueItemStatus status;
   final String? errorMessage;
   final int attempts;
+  /// Progresso do envio (0.0 – 1.0).
+  final double progress;
 
   UploadQueueItem copyWith({
     UploadQueueItemStatus? status,
     String? errorMessage,
     int? attempts,
     List<int>? bytes,
+    double? progress,
     bool clearBytes = false,
   }) {
     return UploadQueueItem(
@@ -56,6 +60,7 @@ class UploadQueueItem {
       status: status ?? this.status,
       errorMessage: errorMessage,
       attempts: attempts ?? this.attempts,
+      progress: progress ?? this.progress,
     );
   }
 
@@ -69,28 +74,8 @@ class UploadQueueItem {
       };
 
   static UploadQueueItem? fromJson(Map<String, dynamic> json) {
-    try {
-      final status = UploadQueueItemStatus.values.firstWhere(
-        (s) => s.name == json['status'],
-        orElse: () => UploadQueueItemStatus.pending,
-      );
-      if (status == UploadQueueItemStatus.completed) return null;
-      // Sem path/bytes persistidos — não retomar uploads pendentes após reinício.
-      if (status == UploadQueueItemStatus.pending ||
-          status == UploadQueueItemStatus.uploading) {
-        return null;
-      }
-      return UploadQueueItem(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
-        status: status,
-        errorMessage: json['errorMessage'] as String?,
-        attempts: json['attempts'] as int? ?? 0,
-      );
-    } catch (_) {
-      return null;
-    }
+    // Bytes/path não são persistidos — ignorar fila guardada após reinício.
+    return null;
   }
 }
 
@@ -136,6 +121,30 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
   final Ref _ref;
   static const _storageKey = 'upload_queue_v1';
   static const _maxAttempts = 3;
+  bool _drainAgain = false;
+  int _lastProgressEmitMs = 0;
+  int _lastProgressPercent = -1;
+
+  bool _shouldEmitProgress(double pct) {
+    final percent = (pct * 100).round().clamp(0, 100);
+    if (percent >= 100 || percent == 0) return true;
+    if (percent != _lastProgressPercent) {
+      _lastProgressPercent = percent;
+      _lastProgressEmitMs = DateTime.now().millisecondsSinceEpoch;
+      return true;
+    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastProgressEmitMs >= 250) {
+      _lastProgressEmitMs = now;
+      return true;
+    }
+    return false;
+  }
+
+  void _resetProgressThrottle() {
+    _lastProgressPercent = -1;
+    _lastProgressEmitMs = 0;
+  }
 
   int _maxFileBytes() {
     final profile = _ref.read(kiamiProfileProvider).valueOrNull;
@@ -176,18 +185,22 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
   }
 
   void enqueueAll(List<UploadQueueRequest> files) {
-    final newItems = files
-        .map(
-          (f) => UploadQueueItem(
-            id: '${DateTime.now().microsecondsSinceEpoch}_${f.name.hashCode}',
-            name: f.name,
-            sizeBytes: f.sizeBytes,
-            path: f.path,
-            bytes: f.bytes,
-            status: UploadQueueItemStatus.pending,
-          ),
-        )
-        .toList();
+    if (files.isEmpty) return;
+    final base = DateTime.now().microsecondsSinceEpoch;
+    final newItems = <UploadQueueItem>[];
+    for (var i = 0; i < files.length; i++) {
+      final f = files[i];
+      newItems.add(
+        UploadQueueItem(
+          id: '${base}_${i}_${f.name.hashCode}',
+          name: f.name,
+          sizeBytes: f.sizeBytes,
+          path: f.path,
+          bytes: f.bytes,
+          status: UploadQueueItemStatus.pending,
+        ),
+      );
+    }
     state = state.copyWith(items: [...state.items, ...newItems]);
     _persist();
     processQueue();
@@ -206,7 +219,7 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
       return i.copyWith(
         status: UploadQueueItemStatus.pending,
         errorMessage: null,
-        clearBytes: true,
+        clearBytes: !kIsWeb,
       );
     }).toList();
     state = state.copyWith(items: items);
@@ -244,15 +257,30 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
     }
   }
 
+  bool _hasPendingWork() {
+    return state.items.any(
+      (i) =>
+          i.status == UploadQueueItemStatus.pending ||
+          (i.status == UploadQueueItemStatus.failed &&
+              i.attempts < _maxAttempts),
+    );
+  }
+
   Future<void> processQueue() async {
-    if (state.isProcessing) return;
-    state = state.copyWith(isProcessing: true);
+    if (state.isProcessing) {
+      _drainAgain = true;
+      return;
+    }
 
-    var sessionSucceeded = 0;
-    var sessionFailed = 0;
+    do {
+      _drainAgain = false;
+      state = state.copyWith(isProcessing: true);
 
-    try {
-      while (true) {
+      var sessionSucceeded = 0;
+      var sessionFailed = 0;
+
+      try {
+        while (true) {
         final index = state.items.indexWhere(
           (i) =>
               i.status == UploadQueueItemStatus.pending ||
@@ -262,11 +290,17 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
         if (index < 0) break;
 
         var item = state.items[index];
+        final itemId = item.id;
         if (item.status == UploadQueueItemStatus.failed) {
           item = item.copyWith(attempts: item.attempts + 1);
         }
 
-        _updateAt(index, item.copyWith(status: UploadQueueItemStatus.uploading));
+        item = item.copyWith(
+          status: UploadQueueItemStatus.uploading,
+          progress: 0,
+        );
+        _resetProgressThrottle();
+        _updateById(itemId, item);
 
         try {
           final bytes = await _loadBytes(item);
@@ -274,32 +308,43 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
                 name: item.name,
                 bytes: bytes,
                 mimeType: guessMimeType(item.name),
+                onProgress: (sent, total) {
+                  if (total <= 0) return;
+                  final pct = (sent / total).clamp(0.0, 1.0);
+                  if (!_shouldEmitProgress(pct)) return;
+                  final current = _findById(itemId);
+                  if (current == null ||
+                      current.status != UploadQueueItemStatus.uploading) {
+                    return;
+                  }
+                  _updateById(itemId, current.copyWith(progress: pct));
+                },
               );
           sessionSucceeded += 1;
-          _updateAt(
-            index,
+          _updateById(
+            itemId,
             item.copyWith(
               status: UploadQueueItemStatus.completed,
+              progress: 1,
               clearBytes: true,
             ),
           );
           state = state.copyWith(
-            items: state.items
-                .where((i) => i.status != UploadQueueItemStatus.completed)
-                .toList(),
+            items: state.items.where((i) => i.id != itemId).toList(),
           );
         } catch (e) {
           sessionFailed += 1;
           final msg = e is KiamiApiException
               ? e.message
               : KiamiApiClient.connectionError().message;
-          _updateAt(
-            index,
+          final failedAttempts = item.attempts + 1;
+          _updateById(
+            itemId,
             item.copyWith(
               status: UploadQueueItemStatus.failed,
               errorMessage: msg,
-              attempts: item.attempts + 1,
-              clearBytes: true,
+              attempts: failedAttempts,
+              clearBytes: !kIsWeb,
             ),
           );
           if (e is KiamiApiException &&
@@ -307,31 +352,47 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
                   e.errorCode == 'file_too_large' ||
                   e.errorCode == 'subscription_restricted' ||
                   e.errorCode == 'subscription_suspended' ||
+                  e.errorCode == 'subscription_inactive' ||
+                  e.errorCode == 'subscription_blocked' ||
                   e.errorCode == 'storage_over_quota')) {
-            break;
+            continue;
           }
           await Future<void>.delayed(
-            Duration(milliseconds: 800 * (item.attempts + 1)),
+            Duration(milliseconds: 800 * failedAttempts),
           );
         }
         await _persist();
+        }
+      } finally {
+        state = state.copyWith(isProcessing: false);
+        await _persist();
+        if (sessionSucceeded > 0) {
+          _ref.invalidate(kiamiProfileProvider);
+          _ref.invalidate(kiamiFilesProvider);
+        } else if (sessionFailed > 0) {
+          _ref.invalidate(kiamiFilesProvider);
+        }
+        if (sessionSucceeded > 0 || sessionFailed > 0) {
+          _ref.read(uploadBatchResultProvider.notifier).state =
+              UploadBatchResult(
+            succeeded: sessionSucceeded,
+            failed: sessionFailed,
+          );
+        }
       }
-    } finally {
-      state = state.copyWith(isProcessing: false);
-      await _persist();
-      if (sessionSucceeded > 0) {
-        _ref.invalidate(kiamiProfileProvider);
-        _ref.invalidate(kiamiFilesProvider);
-      } else if (sessionFailed > 0) {
-        _ref.invalidate(kiamiFilesProvider);
-      }
-      if (sessionSucceeded > 0 || sessionFailed > 0) {
-        _ref.read(uploadBatchResultProvider.notifier).state = UploadBatchResult(
-          succeeded: sessionSucceeded,
-          failed: sessionFailed,
-        );
-      }
+    } while (_drainAgain || _hasPendingWork());
+  }
+
+  UploadQueueItem? _findById(String id) {
+    for (final item in state.items) {
+      if (item.id == id) return item;
     }
+    return null;
+  }
+
+  void _updateById(String id, UploadQueueItem item) {
+    final index = state.items.indexWhere((i) => i.id == id);
+    if (index >= 0) _updateAt(index, item);
   }
 
   void _updateAt(int index, UploadQueueItem item) {

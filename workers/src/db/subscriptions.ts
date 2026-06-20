@@ -181,19 +181,27 @@ export async function activateOrRenewSubscription(
 
   await db.batch(batch);
 
-  await insertAccountEvent(db, {
-    firebaseUid: input.firebaseUid,
-    kind: 'subscription_renewed',
-    title: 'Subscrição activa',
-    body: 'O teu plano foi activado ou renovado com sucesso.',
-    metadata: { planCode: input.planCode, endsAt: endsAt || null },
-  });
+  try {
+    await insertAccountEvent(db, {
+      firebaseUid: input.firebaseUid,
+      kind: 'subscription_renewed',
+      title: 'Subscrição activa',
+      body: 'O teu plano foi activado ou renovado com sucesso.',
+      metadata: { planCode: input.planCode, endsAt: endsAt || null },
+    });
+  } catch (err) {
+    console.warn('[subscriptions] account event failed:', err);
+  }
 
-  await logSecurityEvent(db, {
-    eventType: 'subscription_renewed',
-    firebaseUid: input.firebaseUid,
-    metadata: { planCode: input.planCode, endsAt: endsAt || null },
-  });
+  try {
+    await logSecurityEvent(db, {
+      eventType: 'subscription_renewed',
+      firebaseUid: input.firebaseUid,
+      metadata: { planCode: input.planCode, endsAt: endsAt || null },
+    });
+  } catch (err) {
+    console.warn('[subscriptions] security event failed:', err);
+  }
 }
 
 function securityEventForSubscriptionStatus(

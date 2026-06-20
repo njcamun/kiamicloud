@@ -31,6 +31,7 @@ import '../activity/account_notifications_popup.dart';
 import '../../utils/kiami_support_contact.dart';
 import '../../utils/kiami_layout.dart';
 import '../../utils/kiami_platform.dart';
+import '../../utils/kiami_web_file_picker.dart';
 import '../../utils/kiami_api_limits.dart';
 import '../activity/providers/profile_quota_sync_provider.dart';
 import '../backup/device_backup_flow.dart';
@@ -82,13 +83,21 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
 
   Future<void> _pickAndUpload() async {
     try {
-      final picked = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        withData: kIsWeb,
-        withReadStream: !kIsWeb,
-      );
-      if (picked == null || picked.files.isEmpty) return;
-      await _handlePickedFiles(picked.files);
+      final List<PlatformFile> files;
+      if (kIsWeb) {
+        final picked = await pickFilesWithWebInput(allowMultiple: true);
+        if (picked == null || picked.isEmpty) return;
+        files = picked;
+      } else {
+        final picked = await FilePicker.platform.pickFiles(
+          allowMultiple: true,
+          withData: false,
+          withReadStream: true,
+        );
+        if (picked == null || picked.files.isEmpty) return;
+        files = picked.files;
+      }
+      await _handlePickedFiles(files);
     } catch (e) {
       if (!mounted) return;
       showKiamiMessage(kiamiApiErrorMessage(e));
@@ -127,8 +136,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
   Widget build(BuildContext context) {
     ref.watch(profileQuotaSyncProvider);
     final profileAsync = ref.watch(kiamiProfileProvider);
-    final filesAsync = ref.watch(kiamiFilesProvider);
+    final filesAsync = ref.watch(kiamiFilesViewProvider);
     final queueState = ref.watch(uploadQueueProvider);
+    UploadQueueItem? uploadingItem;
+    for (final item in queueState.items) {
+      if (item.status == UploadQueueItemStatus.uploading) {
+        uploadingItem = item;
+        break;
+      }
+    }
+    final uploadProgress = uploadingItem?.progress ?? 0.0;
     final allFiles = filesAsync.valueOrNull ?? const <KiamiFile>[];
     final isWide = kiamiIsWideLayout(context);
     final isNativeDesktop = kiamiIsNativeDesktop();
@@ -247,25 +264,31 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                profileAsync.when(
-                                  data: (p) => _DashboardTopSection(
-                                    profile: p,
-                                    queueProcessing: queueState.isProcessing,
-                                    fullWidthUpload:
-                                        isNativeDesktop && isWide,
-                                    fixedStorageCard: fixedStorageOnMobile,
-                                    onPickUpload: _pickAndUpload,
-                                    onFilesDropped: _handlePickedFiles,
-                                    maxPerFileLabel:
-                                        formatTransferLimit(p.maxFileSizeBytes),
-                                  ),
-                                  loading: () => fixedStorageOnMobile
-                                      ? const SizedBox.shrink()
-                                      : const KiamiStorageCardSkeleton(),
-                                  error: (e, _) => KiamiApiUnavailableCard(
-                                    error: e,
-                                    compact: true,
-                                    onRetry: refreshKiamiFiles,
+                                _DashboardTopSection(
+                                  profile: profile,
+                                  profileLoading: profileAsync.isLoading,
+                                  profileError: profileAsync.hasError,
+                                  queueProcessing: queueState.isProcessing,
+                                  uploadProgress: uploadProgress,
+                                  fullWidthUpload:
+                                      isNativeDesktop && isWide,
+                                  fixedStorageCard: fixedStorageOnMobile,
+                                  onPickUpload: profileAsync.isLoading
+                                      ? () => showKiamiMessage(
+                                            KiamiStrings.uploadProfileLoading,
+                                          )
+                                      : profileAsync.hasError
+                                          ? () => showKiamiMessage(
+                                                KiamiStrings.apiUnavailableTitle,
+                                              )
+                                          : _pickAndUpload,
+                                  onFilesDropped: profileAsync.isLoading ||
+                                          profileAsync.hasError
+                                      ? (_) async {}
+                                      : _handlePickedFiles,
+                                  maxPerFileLabel: formatTransferLimit(
+                                    profile?.maxFileSizeBytes ??
+                                        KiamiConstants.maxUploadBytes,
                                   ),
                                 ),
                                 const UploadQueuePanel(),
@@ -356,7 +379,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
 class _DashboardTopSection extends StatelessWidget {
   const _DashboardTopSection({
     required this.profile,
+    required this.profileLoading,
+    required this.profileError,
     required this.queueProcessing,
+    required this.uploadProgress,
     required this.fullWidthUpload,
     required this.fixedStorageCard,
     required this.onPickUpload,
@@ -364,9 +390,12 @@ class _DashboardTopSection extends StatelessWidget {
     required this.maxPerFileLabel,
   });
 
-  final KiamiProfile profile;
+  final KiamiProfile? profile;
+  final bool profileLoading;
+  final bool profileError;
   final String maxPerFileLabel;
   final bool queueProcessing;
+  final double uploadProgress;
   final bool fullWidthUpload;
   final bool fixedStorageCard;
   final VoidCallback onPickUpload;
@@ -374,33 +403,46 @@ class _DashboardTopSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = profile;
+    final uploadEnabled =
+        !queueProcessing && !profileLoading && !profileError && p != null;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (KiamiApiLimits.enforced) ...[
-            if (profile.access != null)
+          if (profileLoading)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+          if (p != null && KiamiApiLimits.enforced) ...[
+            if (p.access != null)
               SubscriptionBanner(
-                access: profile.access!,
+                access: p.access!,
                 onRenew: () => context.push(KiamiRoutes.billing),
               ),
             QuotaBanner(
-              quota: profile.quota,
-              storageUsedBytes: profile.storageUsedBytes,
-              quotaBytes: profile.plan.quotaBytes,
-              storageAvailableBytes: profile.storageAvailableBytes,
+              quota: p.quota,
+              storageUsedBytes: p.storageUsedBytes,
+              quotaBytes: p.plan.quotaBytes,
+              storageAvailableBytes: p.storageAvailableBytes,
               onUpgrade: () => context.push(KiamiRoutes.billing),
             ),
           ],
-          if (!fixedStorageCard) ...[
+          if (p != null && !fixedStorageCard) ...[
             KiamiStorageCard(
-              profile: profile,
+              profile: p,
               expanded: fullWidthUpload,
               onHelpTap: () => showKiamiStorageHelp(context),
             ),
             const SizedBox(height: 16),
-          ],
+          ] else if (profileLoading && !fixedStorageCard)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: KiamiStorageCardSkeleton(),
+            ),
           LayoutBuilder(
             builder: (context, constraints) {
               final maxW = constraints.maxWidth;
@@ -409,12 +451,13 @@ class _DashboardTopSection extends StatelessWidget {
                   : null;
 
               return UploadDropTarget(
-                enabled: !queueProcessing,
+                enabled: uploadEnabled,
                 onFilesDropped: onFilesDropped,
                 child: KiamiUploadZone(
                   isLoading: queueProcessing,
-                  enabled: !queueProcessing,
+                  enabled: uploadEnabled,
                   onTap: onPickUpload,
+                  uploadProgress: uploadProgress,
                   progressCurrent: 0,
                   progressTotal: 0,
                   cardWidth: cardWidth,

@@ -55,6 +55,9 @@ desktop.ini
 *.temp
 .cache/
 
+# --- Firebase CLI (cache local; não versionar) ---
+.firebase/
+
 # --- Coverage e testes ---
 coverage/
 .nyc_output/

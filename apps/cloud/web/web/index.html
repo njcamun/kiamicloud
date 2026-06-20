@@ -1,46 +1,133 @@
 <!DOCTYPE html>
-<html>
+
+<html lang="pt">
+
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
 
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="KiamiCloud — Minha Cloud. Meu mundo. Sem limites.">
 
-  <!-- iOS meta tags & icons -->
+
+  <meta charset="UTF-8">
+
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <meta name="description" content="KiamiCloud - Minha Cloud. Meu mundo. Sem limites.">
+
+  <meta name="theme-color" content="#1565FF">
+
+  <meta name="google-signin-client_id" content="372525178999-ml8uov59ijvcnu3rkqrpobncom9a7444.apps.googleusercontent.com">
+
+
+
+  <!-- PWA / Android Chrome -->
+
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  <link rel="manifest" href="manifest.json">
+
+
+
+  <!-- iOS Safari — Adicionar ao ecrã inicial -->
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <meta name="apple-mobile-web-app-title" content="KiamiCloud">
+
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-  <!-- Favicon -->
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/Icon-192.png">
+
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
+
+
+
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>KiamiCloud</title>
-  <link rel="manifest" href="manifest.json">
-</head>
-<body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+
+
+  <!-- Instalação PWA (Android/Chrome) — evento beforeinstallprompt -->
+
+  <script>
+
+    window.kiamiDeferredInstallPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+
+      e.preventDefault();
+
+      window.kiamiDeferredInstallPrompt = e;
+
+      window.dispatchEvent(new Event('kiami-pwa-install-available'));
+
+    });
+
+    window.addEventListener('appinstalled', function () {
+
+      window.kiamiDeferredInstallPrompt = null;
+
+      window.dispatchEvent(new Event('kiami-pwa-installed'));
+
+    });
+
+    window.kiamiInstallPwa = function () {
+
+      var e = window.kiamiDeferredInstallPrompt;
+
+      if (!e) return Promise.resolve('unavailable');
+
+      return e.prompt().then(function () {
+
+        return e.userChoice;
+
+      }).then(function (choice) {
+
+        window.kiamiDeferredInstallPrompt = null;
+
+        return choice.outcome;
+
+      });
+
+    };
+
+  </script>
+
+</head>
+
+<body>
+
+  <script src='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs' type='module'></script>
+
+  <script type='module'>
+
+  var { pdfjsLib } = globalThis;
+
+  globalThis.pdfjsLib = pdfjsLib;
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.mjs';
+
+
+
+  globalThis.pdfRenderOptions = {
+
+    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/cmaps/',
+
+    cMapPacked: true,
+
+  };
+
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
+
 </body>
+
 </html>
+
+

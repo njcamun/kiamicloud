@@ -1,4 +1,13 @@
 # Build Flutter Web e publica em Firebase Hosting (kiamicloud.web.app).
+#
+# Uso:
+#   .\scripts\deploy-web-firebase.ps1
+#
+# Deploy automatico (GitHub Actions):
+#   - Push para master dispara .github/workflows/deploy-web.yml
+#   - Requer secret FIREBASE_SERVICE_ACCOUNT_KIAMICLOUD no repositorio
+#     (JSON da service account Firebase com role Firebase Hosting Admin)
+#
 param(
     [switch]$SkipBuild
 )
@@ -18,13 +27,13 @@ function Require-Command($name, $installHint) {
     }
 }
 
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  KiamiCloud — Deploy Web (Firebase)" -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ''
+Write-Host '========================================' -ForegroundColor Cyan
+Write-Host '  KiamiCloud - Deploy Web (Firebase)' -ForegroundColor Cyan
+Write-Host '========================================' -ForegroundColor Cyan
 Write-Host "  Projecto: $ProjectId" -ForegroundColor Gray
-Write-Host "  URL:      https://kiamicloud.web.app" -ForegroundColor Gray
-Write-Host ""
+Write-Host '  URL:      https://kiamicloud.web.app' -ForegroundColor Gray
+Write-Host ''
 
 Require-Command 'flutter' 'Instale Flutter: https://flutter.dev/'
 Require-Command 'node' 'Instale Node.js: https://nodejs.org/ (para firebase-tools)'
@@ -34,7 +43,7 @@ if (-not (Test-Path (Join-Path $Root 'firebase.json'))) {
     exit 1
 }
 
-Write-Host "[1/4] Dependencias Flutter..." -ForegroundColor Cyan
+Write-Host '[1/4] Dependencias Flutter...' -ForegroundColor Cyan
 Push-Location $CoreDir
 try {
     flutter pub get
@@ -55,7 +64,7 @@ finally {
 
 $syncScript = Join-Path $Root 'tool\sync_branding.dart'
 if (Test-Path $syncScript) {
-    Write-Host "[2/4] Sync branding..." -ForegroundColor Cyan
+    Write-Host '[2/4] Sync branding...' -ForegroundColor Cyan
     Push-Location $Root
     try {
         dart run tool/sync_branding.dart
@@ -64,30 +73,35 @@ if (Test-Path $syncScript) {
     finally {
         Pop-Location
     }
-} else {
-    Write-Host "[2/4] Sync branding — ignorado (ficheiro em falta)" -ForegroundColor Yellow
+}
+else {
+    Write-Host '[2/4] Sync branding ignorado (ficheiro em falta)' -ForegroundColor Yellow
 }
 
 if (-not $SkipBuild) {
-    Write-Host "[3/4] flutter build web --release..." -ForegroundColor Cyan
+    Write-Host '[3/4] Icones PWA + flutter build web --release...' -ForegroundColor Cyan
     Push-Location $WebDir
     try {
-        flutter build web --release --base-href /
+        dart run flutter_launcher_icons
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        flutter build web --release --base-href / --no-wasm-dry-run
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
     finally {
         Pop-Location
     }
-} else {
-    Write-Host "[3/4] Build ignorado (-SkipBuild)" -ForegroundColor Yellow
-    if (-not (Test-Path (Join-Path $BuildDir 'index.html'))) {
-        Write-Host "ERRO: Nao existe build em $BuildDir — execute sem -SkipBuild" -ForegroundColor Red
+}
+else {
+    Write-Host '[3/4] Build ignorado (-SkipBuild)' -ForegroundColor Yellow
+    $indexHtml = Join-Path $BuildDir 'index.html'
+    if (-not (Test-Path $indexHtml)) {
+        Write-Host "ERRO: Nao existe build em $BuildDir. Execute sem -SkipBuild." -ForegroundColor Red
         exit 1
     }
 }
 
-Write-Host "[4/4] firebase deploy --only hosting..." -ForegroundColor Cyan
-Write-Host "      (Se pedir login: npx firebase-tools login)" -ForegroundColor Gray
+Write-Host '[4/4] firebase deploy --only hosting...' -ForegroundColor Cyan
+Write-Host '      (Se pedir login: npx firebase-tools login)' -ForegroundColor Gray
 Push-Location $Root
 try {
     npx --yes firebase-tools@latest deploy --only hosting --project $ProjectId
@@ -97,10 +111,10 @@ finally {
     Pop-Location
 }
 
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Green
-Write-Host "  Site publicado com sucesso" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Green
-Write-Host "  https://kiamicloud.web.app" -ForegroundColor White
-Write-Host "  https://kiamicloud.firebaseapp.com" -ForegroundColor White
-Write-Host ""
+Write-Host ''
+Write-Host '========================================' -ForegroundColor Green
+Write-Host '  Site publicado com sucesso' -ForegroundColor Green
+Write-Host '========================================' -ForegroundColor Green
+Write-Host '  https://kiamicloud.web.app' -ForegroundColor White
+Write-Host '  https://kiamicloud.firebaseapp.com' -ForegroundColor White
+Write-Host ''

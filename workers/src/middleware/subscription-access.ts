@@ -4,7 +4,7 @@ import { getStorageContext } from '../db/files';
 import { resolveSubscriptionAccessForUser } from '../db/subscriptions';
 import { subscriptionBlockMessage } from '../lib/subscription-access';
 
-type AccessAction = 'upload' | 'download' | 'share';
+type AccessAction = 'upload' | 'download';
 
 export async function enforceSubscriptionAccess(
   c: Context<{ Bindings: Env; Variables: AppVariables }>,
@@ -29,11 +29,7 @@ export async function enforceSubscriptionAccess(
   });
 
   const allowed =
-    action === 'upload'
-      ? access.canUpload
-      : action === 'download'
-        ? access.canDownload
-        : access.canShare;
+    action === 'upload' ? access.canUpload : access.canDownload;
 
   if (allowed) return null;
 

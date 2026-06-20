@@ -17,16 +17,25 @@ class UploadCompletionListener extends ConsumerWidget {
       final messenger = ScaffoldMessenger.maybeOf(context);
       if (messenger == null) return;
 
+      final queue = ref.read(uploadQueueProvider);
+      final firstFailed = queue.items
+          .where((i) => i.status == UploadQueueItemStatus.failed)
+          .map((i) => i.errorMessage)
+          .whereType<String>()
+          .firstOrNull;
+
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            KiamiStrings.uploadBackgroundComplete(
-              next.succeeded,
-              next.failed,
-            ),
+            next.failed > 0 && firstFailed != null
+                ? '${KiamiStrings.uploadBackgroundComplete(next.succeeded, next.failed)} $firstFailed'
+                : KiamiStrings.uploadBackgroundComplete(
+                    next.succeeded,
+                    next.failed,
+                  ),
           ),
           behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: next.failed > 0 ? 6 : 4),
+          duration: Duration(seconds: next.failed > 0 ? 8 : 4),
         ),
       );
       ref.read(uploadBatchResultProvider.notifier).state = null;

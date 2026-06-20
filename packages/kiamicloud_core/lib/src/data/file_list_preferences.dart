@@ -21,7 +21,9 @@ class FileListPreferences {
     final raw = _prefs.getString('$_viewPrefix$categoryId');
     return FileListViewMode.values.firstWhere(
       (m) => m.name == raw,
-      orElse: () => FileListViewMode.list,
+      orElse: () => categoryId == 'images'
+          ? FileListViewMode.grid
+          : FileListViewMode.list,
     );
   }
 
@@ -33,7 +35,9 @@ class FileListPreferences {
     final raw = _prefs.getString('$_sortPrefix$categoryId');
     return FileListSortOption.values.firstWhere(
       (s) => s.name == raw,
-      orElse: () => FileListSortOption.nameAsc,
+      orElse: () => categoryId == 'images'
+          ? FileListSortOption.dateDesc
+          : FileListSortOption.nameAsc,
     );
   }
 

@@ -466,30 +466,57 @@ export async function updateUserByAdmin(
     ? input.canSwitchApiEndpoint!
     : existing.canSwitchApiEndpoint;
 
-  await db
-    .prepare(
-      `UPDATE users SET
-         plan_code = ?,
-         quota_bytes_override = ?,
-         max_file_size_bytes_override = ?,
-         can_switch_api_endpoint = ?,
-         updated_at = datetime('now')
-       WHERE firebase_uid = ?`,
-    )
-    .bind(
-      planCode,
-      quotaOverride,
-      transferOverride,
-      canSwitchApiEndpoint ? 1 : 0,
-      input.targetUid,
-    )
-    .run();
+  const previousPlanCode = existing.planCode;
 
   if (hasPlanChange) {
-    await activateOrRenewSubscription(db, {
-      firebaseUid: input.targetUid,
-      planCode,
-    });
+    try {
+      await activateOrRenewSubscription(db, {
+        firebaseUid: input.targetUid,
+        planCode: incomingPlanCode!,
+      });
+    } catch (err) {
+      console.error('[admin] activateOrRenewSubscription failed:', err);
+      return {
+        error:
+          'Nao foi possivel activar a subscrição do novo plano. Tente novamente.',
+      };
+    }
+  }
+
+  try {
+    await db
+      .prepare(
+        `UPDATE users SET
+           plan_code = ?,
+           quota_bytes_override = ?,
+           max_file_size_bytes_override = ?,
+           can_switch_api_endpoint = ?,
+           updated_at = datetime('now')
+         WHERE firebase_uid = ?`,
+      )
+      .bind(
+        planCode,
+        quotaOverride,
+        transferOverride,
+        canSwitchApiEndpoint ? 1 : 0,
+        input.targetUid,
+      )
+      .run();
+  } catch (err) {
+    console.error('[admin] UPDATE users failed:', err);
+    if (hasPlanChange) {
+      try {
+        await db
+          .prepare(
+            `UPDATE users SET plan_code = ?, updated_at = datetime('now') WHERE firebase_uid = ?`,
+          )
+          .bind(previousPlanCode, input.targetUid)
+          .run();
+      } catch (rollbackErr) {
+        console.error('[admin] rollback plan_code failed:', rollbackErr);
+      }
+    }
+    return { error: 'Falha ao actualizar utilizador.' };
   }
 
   const changes: Record<string, unknown> = {};
@@ -551,18 +578,22 @@ export async function updateUserByAdmin(
     const eventBody = hasOverrideChange
       ? `Armazenamento: ${quotaGb} GB · Transferência máx.: ${transferMb} MB por ficheiro.`
       : `Armazenamento: ${quotaGb} GB.`;
-    await insertAccountEvent(db, {
-      firebaseUid: input.targetUid,
-      kind: 'quota_updated',
-      title: 'Limites actualizados',
-      body: eventBody,
-      metadata: {
-        quotaBytes: updated.quotaBytes,
-        maxFileSizeBytes: updated.maxFileSizeBytes,
-        quotaOverrideBytes: updated.quotaOverrideBytes,
-        transferOverrideBytes: updated.transferOverrideBytes,
-      },
-    });
+    try {
+      await insertAccountEvent(db, {
+        firebaseUid: input.targetUid,
+        kind: 'quota_updated',
+        title: 'Limites actualizados',
+        body: eventBody,
+        metadata: {
+          quotaBytes: updated.quotaBytes,
+          maxFileSizeBytes: updated.maxFileSizeBytes,
+          quotaOverrideBytes: updated.quotaOverrideBytes,
+          transferOverrideBytes: updated.transferOverrideBytes,
+        },
+      });
+    } catch (err) {
+      console.warn('[admin] quota_updated event failed:', err);
+    }
   }
 
   return { user: updated };

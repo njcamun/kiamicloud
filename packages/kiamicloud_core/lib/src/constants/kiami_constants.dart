@@ -22,6 +22,17 @@ abstract final class KiamiConstants {
   static const String cloudBetaApiBaseUrl =
       'https://kiamicloud-api-beta.kiamicloud.workers.dev';
 
+  /// URL da API em runtime: beta por defeito; override com
+  /// `--dart-define=KIAMI_API_BASE_URL=http://localhost:8787`.
+  static String get configuredApiBaseUrl {
+    const fromEnv = String.fromEnvironment('KIAMI_API_BASE_URL');
+    final trimmed = fromEnv.trim();
+    if (trimmed.isNotEmpty) {
+      return trimmed.replaceAll(RegExp(r'/+$'), '');
+    }
+    return cloudBetaApiBaseUrl;
+  }
+
   /// IP estático do ZimaBlade (reserva DHCP no router).
   static const String bladeStaticHost = '192.168.100.170';
   static const int bladeApiPort = 8787;

@@ -18,7 +18,14 @@ class _KiamiAppState extends ConsumerState<KiamiApp> {
   ThemeMode _themeMode = ThemeMode.light;
 
   @override
+  void initState() {
+    super.initState();
+    debugPrint('KiamiApp: initState');
+  }
+
+  @override
   Widget build(BuildContext context) {
+    debugPrint('KiamiApp: a construir...');
     final router = ref.watch(kiamiRouterProvider);
 
     return KiamiThemeScope(

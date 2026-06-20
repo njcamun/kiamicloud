@@ -1,5 +1,12 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    - lib/src/pwa/pwa_install_web.dart
+    - lib/src/utils/kiami_web_file_picker_web.dart
+    - lib/src/utils/web_online_web.dart
+    - lib/src/api/upload_put_client_web.dart
+
 linter:
   rules:
     prefer_const_constructors: true

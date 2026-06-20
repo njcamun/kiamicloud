@@ -34,6 +34,19 @@ class UploadFileRejected extends UploadFilePickOutcome {
   final int? sizeBytes;
 }
 
+int platformFileEffectiveSize(PlatformFile file) {
+  if (file.bytes != null && file.bytes!.isNotEmpty) {
+    return file.bytes!.length;
+  }
+  return file.size;
+}
+
+bool platformFileHasSource(PlatformFile file) {
+  return (file.bytes != null && file.bytes!.isNotEmpty) ||
+      file.readStream != null ||
+      (!kIsWeb && file.path != null && file.path!.isNotEmpty);
+}
+
 /// Valida tamanho sem ler o ficheiro (multi-upload — evita OOM).
 UploadFilePickOutcome validatePlatformFileForUpload({
   required PlatformFile file,
@@ -41,37 +54,40 @@ UploadFilePickOutcome validatePlatformFileForUpload({
   required int storageAvailableBytes,
 }) {
   final name = file.name;
-  final reportedSize = file.size;
 
-  if (reportedSize <= 0) {
+  if (!platformFileHasSource(file)) {
     return UploadFileRejected(
       name: name,
       reason: UploadFileRejectReason.unreadable,
+      sizeBytes: file.size,
     );
   }
-  if (reportedSize > maxFileBytes) {
+
+  final effectiveSize = platformFileEffectiveSize(file);
+  if (effectiveSize <= 0) {
+    // Web: bytes ainda por carregar (stream) — validar depois da leitura.
+    if (file.readStream != null || (file.bytes != null && file.bytes!.isEmpty)) {
+      return UploadFileReady(name: name, bytes: const []);
+    }
+    return UploadFileRejected(
+      name: name,
+      reason: UploadFileRejectReason.unreadable,
+      sizeBytes: effectiveSize,
+    );
+  }
+
+  if (effectiveSize > maxFileBytes) {
     return UploadFileRejected(
       name: name,
       reason: UploadFileRejectReason.tooLargePerFile,
-      sizeBytes: reportedSize,
+      sizeBytes: effectiveSize,
     );
   }
-  if (reportedSize > storageAvailableBytes) {
+  if (effectiveSize > storageAvailableBytes) {
     return UploadFileRejected(
       name: name,
       reason: UploadFileRejectReason.exceedsQuota,
-      sizeBytes: reportedSize,
-    );
-  }
-
-  final hasSource = file.bytes != null ||
-      (file.path != null && file.path!.isNotEmpty) ||
-      file.readStream != null;
-  if (!hasSource) {
-    return UploadFileRejected(
-      name: name,
-      reason: UploadFileRejectReason.unreadable,
-      sizeBytes: reportedSize,
+      sizeBytes: effectiveSize,
     );
   }
 
@@ -85,7 +101,7 @@ Future<UploadFilePickOutcome> readPlatformFileForUpload({
   required int storageAvailableBytes,
 }) async {
   final name = file.name;
-  final reportedSize = file.size;
+  final reportedSize = platformFileEffectiveSize(file);
 
   if (reportedSize > 0) {
     if (reportedSize > maxFileBytes) {
@@ -142,6 +158,17 @@ Future<UploadFilePickOutcome> readPlatformFileForUpload({
 Future<List<int>?> _loadBytes(PlatformFile file, int maxBytes) async {
   if (file.bytes != null && file.bytes!.isNotEmpty) {
     return file.bytes;
+  }
+
+  if (kIsWeb && file.readStream != null) {
+    final builder = BytesBuilder(copy: false);
+    var total = 0;
+    await for (final chunk in file.readStream!) {
+      total += chunk.length;
+      if (total > maxBytes) return null;
+      builder.add(chunk);
+    }
+    return builder.takeBytes();
   }
 
   if (!kIsWeb && file.path != null && file.path!.isNotEmpty) {

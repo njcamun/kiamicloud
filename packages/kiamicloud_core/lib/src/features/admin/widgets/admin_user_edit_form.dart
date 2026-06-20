@@ -115,10 +115,10 @@ class _AdminUserEditFormState extends ConsumerState<AdminUserEditForm> {
       final expectedStorage = _expectedStorageBytes;
       final expectedTransfer = _expectedTransferBytes;
 
-      // planCode sempre no body — APIs antigas só validavam plano/transferência.
+      // planCode só quando mudou — evita "Nada para actualizar" após sucesso parcial.
       final updated = await api.updateAdminUser(
         uid: widget.user.uid,
-        planCode: _selectedPlan,
+        planCode: _selectedPlan != widget.user.planCode ? _selectedPlan : null,
         quotaBytesOverride:
             _limitsEnforced && _customStorage ? _storageBytes : null,
         clearQuotaOverride: _limitsEnforced &&

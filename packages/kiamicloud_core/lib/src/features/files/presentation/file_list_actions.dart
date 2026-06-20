@@ -1,6 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/kiami_api_exception.dart';
@@ -9,14 +10,20 @@ import '../../../constants/kiami_strings.dart';
 import '../../../data/offline_cache.dart';
 import '../../../data/offline_mutation_queue.dart';
 import '../../../utils/docx_preview.dart';
+import '../../../utils/file_category.dart';
+import '../../photos/presentation/photo_album_dialogs.dart';
+import '../../photos/presentation/photo_gallery_actions.dart';
+import '../../photos/providers/photo_library_providers.dart';
 import '../../../utils/pdf_preview.dart';
 import '../../../utils/text_preview.dart';
 import '../../connectivity/connectivity_provider.dart';
 import '../providers/files_providers.dart';
 import '../../../utils/kiami_error_presenter.dart';
+import 'audio_gallery_actions.dart';
 import 'file_actions_dialogs.dart';
 import 'file_gallery_page.dart';
 import 'file_preview_page.dart';
+import 'video_gallery_actions.dart';
 
 /// Acções partilhadas (download, renomear, apagar) em listas de ficheiros.
 mixin KiamiFileListActions<T extends ConsumerStatefulWidget>
@@ -31,7 +38,16 @@ mixin KiamiFileListActions<T extends ConsumerStatefulWidget>
   }
 
   void showKiamiMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(text),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+      ),
+    );
   }
 
   Future<void> downloadKiamiFile(KiamiFile file) async {
@@ -95,6 +111,58 @@ mixin KiamiFileListActions<T extends ConsumerStatefulWidget>
       loadMediaSource: (KiamiFile f) =>
           ref.read(kiamiApiClientProvider).getFileDownloadInfo(f.id),
       onDownload: downloadKiamiFile,
+      photoActions: _photoGalleryActions(contextFiles),
+      videoActions: _videoGalleryActions(contextFiles),
+      audioActions: _audioGalleryActions(contextFiles),
+    );
+  }
+
+  AudioGalleryActions? _audioGalleryActions(List<KiamiFile> files) {
+    if (files.isEmpty) return null;
+    final allAudio = files.every(
+      (f) => fileCategoryForName(f.name) == KiamiFileCategory.audio,
+    );
+    if (!allAudio) return null;
+
+    return AudioGalleryActions(
+      onDelete: deleteKiamiFile,
+      onDownload: downloadKiamiFile,
+    );
+  }
+
+  VideoGalleryActions? _videoGalleryActions(List<KiamiFile> files) {
+    if (files.isEmpty) return null;
+    final allVideos = files.every(
+      (f) => fileCategoryForName(f.name) == KiamiFileCategory.video,
+    );
+    if (!allVideos) return null;
+
+    return VideoGalleryActions(
+      onDelete: deleteKiamiFile,
+      onDownload: downloadKiamiFile,
+    );
+  }
+
+  PhotoGalleryActions? _photoGalleryActions(List<KiamiFile> files) {
+    if (files.isEmpty) return null;
+    final allPhotos = files.every(
+      (f) => fileCategoryForName(f.name) == KiamiFileCategory.images,
+    );
+    if (!allPhotos) return null;
+
+    return PhotoGalleryActions(
+      isFavorite: (id) =>
+          ref.read(photoLibraryProvider).valueOrNull?.isFavorite(id) ?? false,
+      onToggleFavorite: (file) =>
+          ref.read(photoLibraryProvider.notifier).toggleFavorite(file.id),
+      onDelete: (file) async {
+        await deleteKiamiFile(file);
+        await ref
+            .read(photoLibraryProvider.notifier)
+            .removeFileReferences(file.id);
+      },
+      onAddToAlbum: (file) =>
+          showAddToPhotoAlbumSheet(context, ref, file: file),
     );
   }
 
@@ -131,20 +199,6 @@ mixin KiamiFileListActions<T extends ConsumerStatefulWidget>
 
   bool _isConnectionError(Object e) {
     return e is KiamiApiException && e.statusCode == null;
-  }
-
-  Future<void> shareKiamiFile(KiamiFile file) async {
-    try {
-      final result = await ref
-          .read(kiamiApiClientProvider)
-          .createFileShare(file.id);
-      await Clipboard.setData(ClipboardData(text: result.shareUrl));
-      if (!mounted) return;
-      showKiamiMessage(KiamiStrings.fileShareCreated);
-    } catch (e) {
-      if (!mounted) return;
-      KiamiErrorPresenter.showSnackBar(context, e);
-    }
   }
 
   Future<void> renameKiamiFile(KiamiFile file) async {

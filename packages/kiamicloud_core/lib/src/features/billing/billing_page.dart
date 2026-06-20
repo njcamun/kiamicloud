@@ -181,7 +181,8 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   Widget build(BuildContext context) {
     final billingAsync = ref.watch(billingStatusProvider);
     final plansAsync = ref.watch(upgradePlansProvider);
-    final showDevSimulate = KiamiEnvironment.isDevelopment;
+    final showDevSimulate =
+        KiamiEnvironment.isDevelopment || KiamiEnvironment.isBeta;
 
     return Scaffold(
       appBar: AppBar(title: const Text(KiamiStrings.billingTitle)),

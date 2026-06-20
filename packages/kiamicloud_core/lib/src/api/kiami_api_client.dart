@@ -10,6 +10,7 @@ import '../constants/kiami_strings.dart';
 import '../features/auth/data/firebase_id_token.dart';
 import 'kiami_api_config.dart';
 import 'kiami_api_exception.dart';
+import 'upload_put_client.dart';
 import 'models/kiami_file.dart';
 import 'models/kiami_account_event.dart';
 import 'models/kiami_admin.dart';
@@ -19,7 +20,6 @@ import 'models/kiami_checkout.dart';
 import 'models/kiami_plan.dart';
 import 'models/kiami_profile.dart';
 import 'models/file_thumbnail_url.dart';
-import 'models/kiami_file_share.dart';
 import 'models/thumbnail_upload_info.dart';
 import 'models/upload_init_result.dart';
 import '../utils/thumbnail_encoder.dart';
@@ -28,7 +28,11 @@ class KiamiApiClient {
   KiamiApiClient({http.Client? httpClient}) : _http = httpClient ?? http.Client();
 
   final http.Client _http;
-  static const Duration _timeout = Duration(seconds: 25);
+  static Duration get _timeout =>
+      kIsWeb ? const Duration(seconds: 45) : const Duration(seconds: 25);
+
+  static const int _webRetryCount = 2;
+  static const Duration _retryDelay = Duration(milliseconds: 900);
 
   /// Timeout proporcional ao tamanho (mín. 2 min, máx. 30 min) —
   /// ficheiros grandes (ex.: 300 MB) demoram vários minutos em Wi-Fi.
@@ -52,27 +56,46 @@ class KiamiApiClient {
   Future<http.Response> _run(
     Future<http.Response> Function() request, {
     Duration? timeout,
+    int retries = 0,
   }) async {
-    try {
-      return await request().timeout(timeout ?? _timeout);
-    } on TimeoutException {
-      throw KiamiApiException(
-        KiamiStrings.apiUnavailableTimeout,
-        errorCode: 'connection_failed',
-      );
-    } on KiamiApiException {
-      rethrow;
-    } on http.ClientException {
-      throw connectionError();
-    } catch (e) {
-      final msg = e.toString();
-      if (msg.contains('SocketException') ||
-          msg.contains('Connection') ||
-          msg.contains('connection abort')) {
-        throw connectionError();
+    final effectiveRetries =
+        kIsWeb ? (retries > 0 ? retries : _webRetryCount) : retries;
+
+    for (var attempt = 0; attempt <= effectiveRetries; attempt++) {
+      try {
+        return await request().timeout(timeout ?? _timeout);
+      } on TimeoutException {
+        if (attempt >= effectiveRetries) {
+          throw KiamiApiException(
+            KiamiStrings.apiUnavailableTimeout,
+            errorCode: 'connection_failed',
+          );
+        }
+      } on KiamiApiException {
+        rethrow;
+      } on http.ClientException {
+        if (attempt >= effectiveRetries) {
+          throw connectionError();
+        }
+      } catch (e) {
+        final msg = e.toString();
+        if (msg.contains('SocketException') ||
+            msg.contains('Connection') ||
+            msg.contains('connection abort') ||
+            msg.contains('Failed to fetch') ||
+            msg.contains('NetworkError')) {
+          if (attempt >= effectiveRetries) {
+            throw connectionError();
+          }
+        } else {
+          rethrow;
+        }
       }
-      rethrow;
+
+      await Future<void>.delayed(_retryDelay * (attempt + 1));
     }
+
+    throw connectionError();
   }
 
   Future<Map<String, String>> _authHeaders({bool jsonBody = false}) async {
@@ -85,6 +108,24 @@ class KiamiApiClient {
       'Accept': 'application/json',
       if (jsonBody) 'Content-Type': 'application/json',
     };
+  }
+
+  /// Headers Bearer para pedidos de conteudo binario (download / miniatura).
+  Future<Map<String, String>> _authHeadersForBinary() async {
+    final headers = await _authHeaders();
+    headers['Accept'] = '*/*';
+    return headers;
+  }
+
+  /// Flutter Web: pede URLs via proxy Worker (evita CORS do R2).
+  void _applyWebWorkerHeaders(
+    Map<String, String> headers, {
+    bool media = false,
+    bool upload = false,
+  }) {
+    if (!kIsWeb) return;
+    if (media) headers['X-Kiami-Media-Via'] = 'worker';
+    if (upload) headers['X-Kiami-Upload-Via'] = 'worker';
   }
 
   Never _throwFromResponse(http.Response response) {
@@ -115,7 +156,8 @@ class KiamiApiClient {
     String baseUrl, {
     Duration? timeout,
   }) async {
-    final effectiveTimeout = timeout ?? const Duration(seconds: 8);
+    final effectiveTimeout = timeout ??
+        (kIsWeb ? const Duration(seconds: 15) : const Duration(seconds: 8));
     final normalized = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
     final uri = Uri.parse('$normalized/health/ping');
     final client = http.Client();
@@ -188,15 +230,6 @@ class KiamiApiClient {
     );
   }
 
-  Future<String> exportUserDataJson() async {
-    final headers = await _authHeaders();
-    final response = await _run(
-      () => _http.get(_uri('/me/export'), headers: headers),
-    );
-    if (response.statusCode != 200) _throwFromResponse(response);
-    return response.body;
-  }
-
   Future<void> deleteAccount() async {
     final headers = await _authHeaders(jsonBody: true);
     final response = await _run(
@@ -228,9 +261,7 @@ class KiamiApiClient {
     String? mimeType,
   }) async {
     final headers = await _authHeaders(jsonBody: true);
-    if (kIsWeb) {
-      headers['X-Kiami-Upload-Via'] = 'worker';
-    }
+    _applyWebWorkerHeaders(headers, upload: true);
     final body = jsonEncode({
       'name': name,
       'sizeBytes': sizeBytes,
@@ -249,6 +280,7 @@ class KiamiApiClient {
     required String name,
     required List<int> bytes,
     String? mimeType,
+    UploadProgressCallback? onProgress,
   }) async {
     final resolvedMime = mimeType ?? 'application/octet-stream';
     final init = await initUpload(
@@ -257,26 +289,26 @@ class KiamiApiClient {
       mimeType: resolvedMime,
     );
 
+    final viaWorker = kIsWeb || init.localDevUpload;
+    final putUrl = viaWorker
+        ? _uri('/files/upload/direct/${init.fileId}').toString()
+        : init.uploadUrl;
+
     final putResponse = await _putUploadBytes(
-      url: init.uploadUrl,
+      url: putUrl,
       bytes: bytes,
       contentType: resolvedMime,
-      useAuth: init.localDevUpload,
+      useAuth: viaWorker,
+      onProgress: onProgress,
     );
 
     if (putResponse.statusCode < 200 || putResponse.statusCode >= 300) {
-      throw KiamiApiException(
-        kIsWeb
-            ? 'Falha ao enviar ficheiro (${putResponse.statusCode}). Verifique a ligacao e tente novamente.'
-            : 'Falha ao enviar ficheiro (${putResponse.statusCode}).',
-        statusCode: putResponse.statusCode,
-      );
+      _throwUploadPutFailure(putResponse);
     }
 
     KiamiFile file;
-    if (init.localDevUpload) {
-      final json = jsonDecode(putResponse.body) as Map<String, dynamic>;
-      file = KiamiFile.fromJson(json['file'] as Map<String, dynamic>);
+    if (viaWorker) {
+      file = _parseUploadPutFile(putResponse);
     } else {
       file = await completeUpload(init.fileId);
     }
@@ -306,17 +338,88 @@ class KiamiApiClient {
     required List<int> bytes,
     required String contentType,
     required bool useAuth,
-  }) {
-    final headers = <String, String>{'Content-Type': contentType};
-    return _run(
-      () async {
-        if (useAuth) {
-          headers.addAll(await _authHeaders());
-        }
-        return _http.put(Uri.parse(url), headers: headers, body: bytes);
-      },
-      timeout: _transferTimeout(bytes.length),
-    );
+    UploadProgressCallback? onProgress,
+  }) async {
+    final headers = <String, String>{};
+    if (useAuth) {
+      final token = await FirebaseIdTokenService.getIdToken();
+      if (token == null) {
+        throw KiamiApiException('Sessão expirada. Inicie sessão novamente.');
+      }
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    try {
+      final result = await putUploadBytes(
+        client: _http,
+        url: url,
+        bytes: bytes,
+        contentType: contentType,
+        headers: headers,
+        onProgress: onProgress,
+        timeout: _transferTimeout(bytes.length),
+      );
+
+      if (result.statusCode == 0) {
+        throw connectionError();
+      }
+
+      return http.Response(
+        result.body,
+        result.statusCode,
+        headers: const {},
+      );
+    } on TimeoutException {
+      throw KiamiApiException(
+        KiamiStrings.apiUnavailableTimeout,
+        errorCode: 'connection_failed',
+      );
+    } on KiamiApiException {
+      rethrow;
+    } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('SocketException') ||
+          msg.contains('Connection') ||
+          msg.contains('Failed to fetch') ||
+          msg.contains('NetworkError')) {
+        throw connectionError();
+      }
+      rethrow;
+    }
+  }
+
+  KiamiFile _parseUploadPutFile(http.Response response) {
+    try {
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      return KiamiFile.fromJson(json['file'] as Map<String, dynamic>);
+    } catch (_) {
+      throw KiamiApiException(
+        'Resposta invalida do servidor apos upload.',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
+  Never _throwUploadPutFailure(http.Response response) {
+    try {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final message =
+          body['message'] as String? ??
+          'Falha ao enviar ficheiro (${response.statusCode}).';
+      throw KiamiApiException(
+        message,
+        statusCode: response.statusCode,
+        errorCode: body['error'] as String?,
+      );
+    } catch (e) {
+      if (e is KiamiApiException) throw e;
+      throw KiamiApiException(
+        kIsWeb
+            ? 'Falha ao enviar ficheiro (${response.statusCode}). Verifique a ligacao e tente novamente.'
+            : 'Falha ao enviar ficheiro (${response.statusCode}).',
+        statusCode: response.statusCode,
+      );
+    }
   }
 
   Future<KiamiFile> _uploadThumbnail({
@@ -324,23 +427,24 @@ class KiamiApiClient {
     required ThumbnailUploadInfo thumb,
     required List<int> bytes,
   }) async {
+    final viaWorker = kIsWeb || thumb.localDevUpload;
+    final putUrl = viaWorker
+        ? _uri('/files/upload/thumb/direct/$fileId').toString()
+        : thumb.uploadUrl;
+
     final response = await _putUploadBytes(
-      url: thumb.uploadUrl,
+      url: putUrl,
       bytes: bytes,
       contentType: 'image/jpeg',
-      useAuth: thumb.localDevUpload,
+      useAuth: viaWorker,
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw KiamiApiException(
-        'Falha ao enviar miniatura (${response.statusCode}).',
-        statusCode: response.statusCode,
-      );
+      _throwUploadPutFailure(response);
     }
 
-    if (thumb.localDevUpload) {
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      return KiamiFile.fromJson(json['file'] as Map<String, dynamic>);
+    if (viaWorker) {
+      return _parseUploadPutFile(response);
     }
 
     return completeThumbnailUpload(fileId);
@@ -362,6 +466,7 @@ class KiamiApiClient {
 
   Future<FileThumbnailUrl?> getFileThumbnailUrl(String fileId) async {
     final headers = await _authHeaders();
+    _applyWebWorkerHeaders(headers, media: true);
     final response = await _run(
       () => _http.get(_uri('/files/$fileId/thumbnail'), headers: headers),
     );
@@ -370,6 +475,7 @@ class KiamiApiClient {
 
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     final localDev = json['localDevThumbnail'] as bool? ?? false;
+    final mediaToken = json['mediaAccessToken'] as bool? ?? false;
     final url = json['thumbnailUrl'] as String;
     final expiresRaw = json['expiresAt'] as String?;
     DateTime? expiresAt;
@@ -380,9 +486,42 @@ class KiamiApiClient {
     return FileThumbnailUrl(
       url: url,
       localDev: localDev,
-      headers: localDev ? await _authHeaders() : const {},
+      headers: localDev && !mediaToken ? await _authHeadersForBinary() : const {},
       expiresAt: expiresAt,
+      mediaAccessToken: mediaToken,
     );
+  }
+
+  /// GET autenticado (miniaturas / media via proxy Worker na Web).
+  Future<Uint8List> fetchAuthenticatedBytes(
+    String url, {
+    Map<String, String>? headers,
+    int? sizeBytes,
+  }) async {
+    final resolvedHeaders = <String, String>{
+      if (headers != null) ...headers,
+    };
+    if (!resolvedHeaders.containsKey('Authorization')) {
+      resolvedHeaders.addAll(await _authHeaders());
+    }
+    if (!resolvedHeaders.containsKey('Accept')) {
+      resolvedHeaders['Accept'] = '*/*';
+    } else if (resolvedHeaders['Accept'] == 'application/json') {
+      resolvedHeaders['Accept'] = '*/*';
+    }
+    final response = await _run(
+      () => _http.get(Uri.parse(url), headers: resolvedHeaders),
+      timeout: sizeBytes != null && sizeBytes > 0
+          ? _transferTimeout(sizeBytes)
+          : const Duration(seconds: 60),
+    );
+    if (response.statusCode != 200 && response.statusCode != 206) {
+      throw KiamiApiException(
+        'Falha ao carregar recurso (${response.statusCode}).',
+        statusCode: response.statusCode,
+      );
+    }
+    return response.bodyBytes;
   }
 
   Future<KiamiFile> completeUpload(String fileId) async {
@@ -405,6 +544,7 @@ class KiamiApiClient {
     String fileId,
   ) async {
     final authHeaders = await _authHeaders();
+    _applyWebWorkerHeaders(authHeaders, media: true);
     final metaResponse = await _run(
       () => _http.get(_uri('/files/$fileId/download'), headers: authHeaders),
     );
@@ -413,14 +553,18 @@ class KiamiApiClient {
     final meta = jsonDecode(metaResponse.body) as Map<String, dynamic>;
     final downloadUrl = meta['downloadUrl'] as String;
     final localDev = meta['localDevDownload'] as bool? ?? false;
+    final mediaToken = meta['mediaAccessToken'] as bool? ?? false;
     return (
       url: downloadUrl,
-      headers: localDev ? await _authHeaders() : <String, String>{},
+      headers: localDev && !mediaToken
+          ? await _authHeadersForBinary()
+          : <String, String>{},
     );
   }
 
   Future<List<int>> downloadFileBytes(String fileId) async {
     final authHeaders = await _authHeaders();
+    _applyWebWorkerHeaders(authHeaders, media: true);
     final metaResponse = await _run(
       () => _http.get(_uri('/files/$fileId/download'), headers: authHeaders),
     );
@@ -429,8 +573,11 @@ class KiamiApiClient {
     final meta = jsonDecode(metaResponse.body) as Map<String, dynamic>;
     final downloadUrl = meta['downloadUrl'] as String;
     final localDev = meta['localDevDownload'] as bool? ?? false;
+    final mediaToken = meta['mediaAccessToken'] as bool? ?? false;
 
-    final headers = localDev ? await _authHeaders() : <String, String>{};
+    final headers = localDev && !mediaToken
+        ? await _authHeadersForBinary()
+        : <String, String>{};
     final sizeBytes =
         ((meta['file'] as Map<String, dynamic>?)?['sizeBytes'] as num?)
                 ?.toInt() ??
@@ -473,45 +620,6 @@ class KiamiApiClient {
     final headers = await _authHeaders();
     final response = await _run(
       () => _http.delete(_uri('/files/$fileId'), headers: headers),
-    );
-    if (response.statusCode != 200) _throwFromResponse(response);
-  }
-
-  Future<CreateFileShareResult> createFileShare(
-    String fileId, {
-    int expiresInDays = 7,
-  }) async {
-    final headers = await _authHeaders(jsonBody: true);
-    final response = await _run(
-      () => _http.post(
-        _uri('/files/$fileId/shares'),
-        headers: headers,
-        body: jsonEncode({'expiresInDays': expiresInDays}),
-      ),
-    );
-    if (response.statusCode != 200) _throwFromResponse(response);
-    return CreateFileShareResult.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
-  }
-
-  Future<List<KiamiFileShare>> listFileShares() async {
-    final headers = await _authHeaders();
-    final response = await _run(
-      () => _http.get(_uri('/files/shares'), headers: headers),
-    );
-    if (response.statusCode != 200) _throwFromResponse(response);
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
-    final list = json['shares'] as List<dynamic>? ?? [];
-    return list
-        .map((e) => KiamiFileShare.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<void> revokeFileShare(String shareId) async {
-    final headers = await _authHeaders();
-    final response = await _run(
-      () => _http.delete(_uri('/files/shares/$shareId'), headers: headers),
     );
     if (response.statusCode != 200) _throwFromResponse(response);
   }
@@ -790,7 +898,7 @@ class KiamiApiClient {
 
   Future<KiamiAdminUser> updateAdminUser({
     required String uid,
-    required String planCode,
+    String? planCode,
     int? quotaBytesOverride,
     bool clearQuotaOverride = false,
     int? maxFileSizeBytesOverride,
@@ -799,7 +907,7 @@ class KiamiApiClient {
   }) async {
     final headers = await _authHeaders(jsonBody: true);
     final body = <String, dynamic>{
-      'planCode': planCode,
+      if (planCode != null) 'planCode': planCode,
       if (clearQuotaOverride) 'clearQuotaOverride': true,
       if (quotaBytesOverride != null) 'quotaBytesOverride': quotaBytesOverride,
       if (clearTransferOverride) 'clearTransferOverride': true,

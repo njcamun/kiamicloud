@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -50,14 +52,26 @@ class _UploadDropTargetState extends State<UploadDropTarget> {
         if (!widget.enabled) return;
         final files = <PlatformFile>[];
         for (final x in details.files) {
-          final length = await x.length();
-          files.add(
-            PlatformFile(
-              name: x.name,
-              size: length,
-              path: x.path,
-            ),
-          );
+          if (kIsWeb) {
+            final bytes = await x.readAsBytes();
+            if (bytes.isEmpty) continue;
+            files.add(
+              PlatformFile(
+                name: x.name,
+                size: bytes.length,
+                bytes: Uint8List.fromList(bytes),
+              ),
+            );
+          } else {
+            final length = await x.length();
+            files.add(
+              PlatformFile(
+                name: x.name,
+                size: length,
+                path: x.path,
+              ),
+            );
+          }
         }
         if (files.isNotEmpty) widget.onFilesDropped(files);
       },

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/kiami_api_config.dart';
@@ -10,6 +11,15 @@ final apiEndpointRevisionProvider = StateProvider<int>((ref) => 0);
 
 /// Sincroniza [KiamiApiConfig] com as preferências guardadas (SharedPreferences).
 Future<void> reloadApiEndpointFromStore() async {
+  if (kIsWeb) {
+    await ApiEndpointStore.clear();
+    KiamiApiConfig.configure(
+      KiamiConstants.cloudBetaApiBaseUrl,
+      mode: KiamiApiEndpointMode.cloud,
+    );
+    return;
+  }
+
   final mode = await ApiEndpointStore.getMode();
   final url = await ApiEndpointStore.loadEffectiveUrl(
     cloudDefault: KiamiConstants.cloudBetaApiBaseUrl,
@@ -35,6 +45,7 @@ final savedLocalApiHostProvider = FutureProvider.autoDispose<String?>((ref) asyn
 });
 
 final canSwitchApiEndpointProvider = Provider<bool>((ref) {
+  if (kIsWeb) return false;
   final profile = ref.watch(kiamiProfileProvider).valueOrNull;
   return profile?.canSwitchApiEndpoint ?? false;
 });
@@ -64,6 +75,16 @@ Future<void> persistAndApplyApiEndpoint(
   required KiamiApiEndpointMode mode,
   String? localHost,
 }) async {
+  if (kIsWeb) {
+    await ApiEndpointStore.clear();
+    applyApiEndpointChange(
+      ref,
+      mode: KiamiApiEndpointMode.cloud,
+      cloudDefault: KiamiConstants.cloudBetaApiBaseUrl,
+    );
+    return;
+  }
+
   await ApiEndpointStore.save(mode: mode, localHost: localHost);
   applyApiEndpointChange(
     ref,

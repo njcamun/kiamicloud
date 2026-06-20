@@ -10,7 +10,6 @@ import { isLocalUnlimitedMode } from './local_unlimited';
 export type SubscriptionAccessDto = {
   canUpload: boolean;
   canDownload: boolean;
-  canShare: boolean;
   status: SubscriptionStatus;
   effectiveStatus: SubscriptionStatus;
   blockReason: string | null;
@@ -71,7 +70,6 @@ export function accessFromEffectiveStatus(
     return {
       canUpload: false,
       canDownload: true,
-      canShare: true,
       status: effectiveStatus,
       effectiveStatus,
       blockReason: 'storage_over_quota',
@@ -85,7 +83,6 @@ export function accessFromEffectiveStatus(
       return {
         canUpload: true,
         canDownload: true,
-        canShare: true,
         status: effectiveStatus,
         effectiveStatus,
         blockReason: null,
@@ -95,7 +92,6 @@ export function accessFromEffectiveStatus(
       return {
         canUpload: false,
         canDownload: true,
-        canShare: true,
         status: effectiveStatus,
         effectiveStatus,
         blockReason: 'subscription_restricted',
@@ -106,7 +102,6 @@ export function accessFromEffectiveStatus(
       return {
         canUpload: false,
         canDownload: false,
-        canShare: false,
         status: effectiveStatus,
         effectiveStatus,
         blockReason: 'subscription_suspended',
@@ -116,7 +111,6 @@ export function accessFromEffectiveStatus(
       return {
         canUpload: false,
         canDownload: false,
-        canShare: false,
         status: 'deleted',
         effectiveStatus: 'deleted',
         blockReason: 'subscription_deleted',
@@ -126,7 +120,6 @@ export function accessFromEffectiveStatus(
       return {
         canUpload: false,
         canDownload: false,
-        canShare: false,
         status: effectiveStatus,
         effectiveStatus,
         blockReason: 'subscription_inactive',
@@ -148,7 +141,6 @@ export function resolveAccess(
     return {
       canUpload: true,
       canDownload: true,
-      canShare: true,
       status: 'active',
       effectiveStatus: 'active',
       blockReason: null,

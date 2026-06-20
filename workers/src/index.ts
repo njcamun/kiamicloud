@@ -14,7 +14,6 @@ import { billingRoutes } from './routes/billing';
 import { adminRoutes } from './routes/admin';
 import { betaRoutes } from './routes/beta';
 import { supportRoutes } from './routes/support';
-import { publicRoutes } from './routes/public';
 import { bladeConsoleRoutes } from './routes/blade-console';
 import { runTrashPurge } from './scheduled/trash_purge';
 import { runSubscriptionLifecycleJob } from './scheduled/subscription_lifecycle';
@@ -25,7 +24,6 @@ app.use('*', securityHeaders());
 app.use('*', kiamiCors());
 app.use('*', rateLimitByIp);
 
-app.route('/public', publicRoutes);
 app.route('/health', healthRoutes);
 app.route('/me/audit', auditRoutes);
 app.route('/me/activity', accountActivityRoutes);
@@ -47,7 +45,6 @@ app.get('/', (c) =>
       healthPing: 'GET /health/ping',
       plans: 'GET /plans',
       me: 'GET|DELETE /me (Bearer) — perfil; DELETE com { confirm: "APAGAR" }',
-      meExport: 'GET /me/export (Bearer) — exportação JSON de dados',
       files:
         'GET|POST|PATCH|DELETE /files/* (Bearer) — upload, download, renomear, apagar',
       audit: 'GET /me/audit (Bearer) — historico de accoes',
@@ -59,7 +56,6 @@ app.get('/', (c) =>
       bladeConsole:
         'GET /blade-console/* (development) — consola LAN; POST /blade-console/login',
       beta: 'GET /beta/info | POST /beta/feedback (Bearer)',
-      publicShare: 'GET /public/share/:token — download partilhado (sem auth)',
     },
   }),
 );

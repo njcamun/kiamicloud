@@ -96,15 +96,37 @@ Future<List<KiamiFile>> _loadFilesWithCache(Ref ref) async {
 }
 
 final kiamiProfileProvider = FutureProvider<KiamiProfile>((ref) async {
-  ref.watch(isOnlineProvider);
+  ref.watch(profileRefreshSignalProvider);
   return _loadProfileWithCache(ref);
 });
 
-final kiamiFilesProvider =
-    FutureProvider.autoDispose<List<KiamiFile>>((ref) async {
-  ref.watch(isOnlineProvider);
+final kiamiFilesProvider = FutureProvider<List<KiamiFile>>((ref) async {
   ref.watch(kiamiProfileProvider);
   return _loadFilesWithCache(ref);
+});
+
+/// Última lista de ficheiros com sucesso — evita skeleton durante refresh.
+final kiamiFilesSnapshotProvider = StateProvider<List<KiamiFile>?>((ref) => null);
+
+/// Mantém snapshot actualizado quando [kiamiFilesProvider] devolve dados.
+final kiamiFilesSnapshotSyncProvider = Provider<void>((ref) {
+  ref.listen<AsyncValue<List<KiamiFile>>>(kiamiFilesProvider, (_, next) {
+    next.whenData((files) {
+      ref.read(kiamiFilesSnapshotProvider.notifier).state = files;
+    });
+  });
+});
+
+/// Lista de ficheiros para UI — usa cache enquanto a API recarrega.
+final kiamiFilesViewProvider = Provider<AsyncValue<List<KiamiFile>>>((ref) {
+  ref.watch(kiamiFilesSnapshotSyncProvider);
+  final async = ref.watch(kiamiFilesProvider);
+  if (async.hasValue) return async;
+  final cached = ref.watch(kiamiFilesSnapshotProvider);
+  if (cached != null && async.isLoading) {
+    return AsyncData(cached);
+  }
+  return async;
 });
 
 String kiamiApiErrorMessage(Object error) {
@@ -124,6 +146,9 @@ String kiamiApiErrorMessage(Object error) {
       'storage_over_quota' => KiamiStrings.subscriptionStorageOverQuota,
       'invalid_token' || 'unauthorized' =>
         'Sessão inválida. Inicie sessão novamente.',
+      'internal_error' => error.message.isNotEmpty
+          ? error.message
+          : 'Erro interno do servidor. Tente novamente.',
       'duplicate_name' => 'Já existe um ficheiro com este nome.',
       _ => error.message.isNotEmpty
           ? error.message

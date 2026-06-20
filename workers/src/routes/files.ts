@@ -22,22 +22,176 @@ import { isThumbnailSource } from '../lib/image-mime';
 import { buildThumbR2ObjectKey } from '../lib/r2-keys';
 import { sanitizeFileName } from '../lib/sanitize';
 import { isLocalUnlimitedMode } from '../lib/local_unlimited';
-import {
-  createFileShare,
-  listFileSharesForUser,
-  revokeFileShare,
-} from '../db/shares';
 import { canPresignR2, presignGet, presignPut } from '../lib/r2-presign';
+import { isBrowserClientOrigin } from '../middleware/cors';
 import { enforceSubscriptionAccess } from '../middleware/subscription-access';
+import {
+  createMediaAccessToken,
+  verifyMediaAccessToken,
+} from '../lib/media-access-token';
+import { resolveSubscriptionAccessForUser } from '../db/subscriptions';
+import { subscriptionBlockMessage } from '../lib/subscription-access';
 
 export const filesRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
 /** Browser / Flutter Web — evita PUT directo ao R2 (CORS). */
 function prefersWorkerUpload(c: {
+  env: Env;
   req: { header: (name: string) => string | undefined };
 }): boolean {
-  return c.req.header('X-Kiami-Upload-Via') === 'worker';
+  if (c.req.header('X-Kiami-Upload-Via') === 'direct') return false;
+  if (c.req.header('X-Kiami-Upload-Via') === 'worker') return true;
+  const env = c.env.ENVIRONMENT ?? 'development';
+  if (env === 'beta' || env === 'production') return true;
+  return isBrowserClientOrigin(c.req.header('Origin'));
 }
+
+/** Browser / Flutter Web — evita GET directo ao R2 (CORS + Authorization). */
+function prefersWorkerMedia(c: {
+  req: { header: (name: string) => string | undefined };
+}): boolean {
+  if (c.req.header('X-Kiami-Media-Via') === 'worker') return true;
+  return isBrowserClientOrigin(c.req.header('Origin'));
+}
+
+function useWorkerFileProxy(c: {
+  env: Env;
+  req: { header: (name: string) => string | undefined };
+}): boolean {
+  return !canPresignR2(c.env) || prefersWorkerMedia(c);
+}
+
+async function streamR2Download(
+  c: {
+    env: Env;
+    req: { header: (name: string) => string | undefined };
+  },
+  row: { r2_object_key: string; name: string },
+): Promise<Response> {
+  const object = await c.env.FILES_BUCKET.get(row.r2_object_key);
+  if (!object) {
+    return c.json({ error: 'not_found', message: 'Objecto ausente no R2.' }, 404);
+  }
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set('Content-Disposition', `inline; filename="${row.name}"`);
+  headers.set('Accept-Ranges', 'bytes');
+  headers.set('Cache-Control', 'private, max-age=3600');
+
+  const rangeHeader = c.req.header('Range');
+  const size = object.size;
+  if (rangeHeader && size != null) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+    if (match) {
+      const start = match[1] ? Number(match[1]) : 0;
+      const end = match[2] ? Number(match[2]) : size - 1;
+      if (
+        Number.isFinite(start) &&
+        Number.isFinite(end) &&
+        start >= 0 &&
+        end >= start &&
+        end < size
+      ) {
+        const ranged = await c.env.FILES_BUCKET.get(row.r2_object_key, {
+          range: { offset: start, length: end - start + 1 },
+        });
+        if (!ranged) {
+          return c.json({ error: 'not_found', message: 'Objecto ausente no R2.' }, 404);
+        }
+        const partialHeaders = new Headers(headers);
+        ranged.writeHttpMetadata(partialHeaders);
+        partialHeaders.set('Content-Disposition', `inline; filename="${row.name}"`);
+        partialHeaders.set('Accept-Ranges', 'bytes');
+        partialHeaders.set('Content-Range', `bytes ${start}-${end}/${size}`);
+        partialHeaders.set('Content-Length', String(end - start + 1));
+        return new Response(ranged.body, { status: 206, headers: partialHeaders });
+      }
+    }
+  }
+
+  return new Response(object.body, { headers });
+}
+
+/** Stream autenticado por token (Flutter Web — video/audio/img). */
+filesRoutes.get('/download/media/:fileId', async (c) => {
+  const fileId = c.req.param('fileId');
+  const auth = await verifyMediaAccessToken(
+    c.env,
+    c.req.query('token'),
+    fileId,
+    'download',
+  );
+  if (!auth) {
+    return c.json(
+      { error: 'unauthorized', message: 'Token de media invalido ou expirado.' },
+      401,
+    );
+  }
+
+  const row = await getFileById(c.env.DB, fileId, auth.uid);
+  if (!row || row.status !== 'active' || !row.r2_object_key) {
+    return c.json({ error: 'not_found', message: 'Ficheiro nao encontrado.' }, 404);
+  }
+
+  const storage = await getStorageContext(c.env.DB, auth.uid, c.env.ENVIRONMENT);
+  if (!storage) {
+    return c.json({ error: 'not_found', message: 'Utilizador nao encontrado.' }, 404);
+  }
+
+  const access = await resolveSubscriptionAccessForUser(c.env.DB, {
+    firebaseUid: auth.uid,
+    planCode: storage.planCode,
+    storageUsedBytes: storage.storageUsedBytes,
+    quotaBytes: storage.quotaBytes,
+    environment: c.env.ENVIRONMENT,
+  });
+  if (!access.canDownload) {
+    return c.json(
+      {
+        error: access.blockReason ?? 'subscription_blocked',
+        message: subscriptionBlockMessage(access.blockReason),
+      },
+      403,
+    );
+  }
+
+  await logDownload(c.env.DB, auth.uid, fileId);
+  return streamR2Download(c, row);
+});
+
+/** Miniatura autenticada por token (Flutter Web). */
+filesRoutes.get('/thumbnail/media/:fileId', async (c) => {
+  const fileId = c.req.param('fileId');
+  const auth = await verifyMediaAccessToken(
+    c.env,
+    c.req.query('token'),
+    fileId,
+    'thumbnail',
+  );
+  if (!auth) {
+    return c.json(
+      { error: 'unauthorized', message: 'Token de media invalido ou expirado.' },
+      401,
+    );
+  }
+
+  const row = await getFileById(c.env.DB, fileId, auth.uid);
+  if (!row || row.status !== 'active' || !row.thumb_r2_object_key) {
+    return c.json({ error: 'not_found', message: 'Miniatura nao disponivel.' }, 404);
+  }
+
+  const object = await c.env.FILES_BUCKET.get(row.thumb_r2_object_key);
+  if (!object) {
+    return c.json({ error: 'not_found', message: 'Objecto ausente no R2.' }, 404);
+  }
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set('Content-Type', 'image/jpeg');
+  headers.set('Cache-Control', 'private, max-age=3600');
+  return new Response(object.body, { headers });
+});
 
 filesRoutes.use('/*', requireAuth);
 filesRoutes.use('/*', rateLimitByUser);
@@ -54,24 +208,6 @@ filesRoutes.get('/trash', async (c) => {
   const user = c.get('user');
   const files = await listTrashFiles(c.env.DB, user.uid);
   return c.json({ files });
-});
-
-/** Lista links de partilha do utilizador. */
-filesRoutes.get('/shares', async (c) => {
-  const user = c.get('user');
-  const shares = await listFileSharesForUser(c.env.DB, user.uid);
-  return c.json({ shares });
-});
-
-/** Revoga um link de partilha. */
-filesRoutes.delete('/shares/:shareId', async (c) => {
-  const user = c.get('user');
-  const shareId = c.req.param('shareId');
-  const ok = await revokeFileShare(c.env.DB, shareId, user.uid);
-  if (!ok) {
-    return c.json({ error: 'not_found', message: 'Partilha não encontrada.' }, 404);
-  }
-  return c.json({ ok: true, shareId });
 });
 
 /** Inicia upload: valida quota, regista pendente, devolve URL de upload. */
@@ -145,7 +281,7 @@ filesRoutes.post('/upload/init', async (c) => {
   });
 
   const origin = new URL(c.req.url).origin;
-  const viaWorker = prefersWorkerUpload(c);
+  const viaWorker = prefersWorkerUpload({ env: c.env, req: c.req });
   const usePresignedR2 = canPresignR2(c.env) && !viaWorker;
 
   const expires = usePresignedR2
@@ -434,40 +570,6 @@ filesRoutes.post('/upload/complete', async (c) => {
   return c.json({ file });
 });
 
-/** Cria link de partilha pública (só leitura). */
-filesRoutes.post('/:fileId/shares', async (c) => {
-  const blocked = await enforceSubscriptionAccess(c, 'share');
-  if (blocked) return blocked;
-
-  const user = c.get('user');
-  const fileId = c.req.param('fileId');
-  const body = (await c.req
-    .json<{ expiresInDays?: number }>()
-    .catch(() => ({}))) as { expiresInDays?: number };
-
-  const share = await createFileShare(c.env.DB, {
-    firebaseUid: user.uid,
-    fileId,
-    expiresInDays: body.expiresInDays,
-  });
-
-  if (!share) {
-    return c.json(
-      { error: 'not_found', message: 'Ficheiro não encontrado ou inactivo.' },
-      404,
-    );
-  }
-
-  const origin = new URL(c.req.url).origin;
-  const shareUrl = `${origin}/public/share/${share.token}`;
-
-  return c.json({
-    share,
-    shareUrl,
-    expiresInDays: body.expiresInDays ?? 7,
-  });
-});
-
 /** Renomear ficheiro (metadado D1; objecto R2 mantem chave original). */
 filesRoutes.patch('/:fileId', async (c) => {
   const user = c.get('user');
@@ -587,12 +689,18 @@ filesRoutes.get('/:fileId/thumbnail', async (c) => {
     );
   }
 
-  if (!canPresignR2(c.env)) {
+  if (useWorkerFileProxy(c)) {
     const origin = new URL(c.req.url).origin;
+    const media = await createMediaAccessToken(c.env, {
+      uid: user.uid,
+      fileId,
+      kind: 'thumbnail',
+    });
     return c.json({
-      thumbnailUrl: `${origin}/files/thumbnail/direct/${fileId}`,
-      expiresAt: null,
-      localDevThumbnail: true,
+      thumbnailUrl: `${origin}/files/thumbnail/media/${fileId}?token=${encodeURIComponent(media.token)}`,
+      expiresAt: media.expiresAt,
+      localDevThumbnail: false,
+      mediaAccessToken: true,
     });
   }
 
@@ -646,14 +754,25 @@ filesRoutes.get('/:fileId/download', async (c) => {
     return c.json({ error: 'server_error', message: 'Chave R2 em falta.' }, 500);
   }
 
-  if (!canPresignR2(c.env)) {
+  if (useWorkerFileProxy(c)) {
     const origin = new URL(c.req.url).origin;
+    const media = await createMediaAccessToken(c.env, {
+      uid: user.uid,
+      fileId,
+      kind: 'download',
+    });
+    await logDownload(c.env.DB, user.uid, fileId);
     return c.json({
-      downloadUrl: `${origin}/files/download/direct/${fileId}`,
-      expiresAt: null,
-      localDevDownload: true,
+      fileId,
+      name: row.name,
+      sizeBytes: row.size_bytes,
+      mimeType: row.mime_type,
+      downloadUrl: `${origin}/files/download/media/${fileId}?token=${encodeURIComponent(media.token)}`,
+      expiresAt: media.expiresAt,
+      localDevDownload: false,
+      mediaAccessToken: true,
       instructions:
-        'Modo local: GET downloadUrl com Authorization Bearer (configure R2 API tokens para URLs pre-assinadas).',
+        'Flutter Web: URL com token temporario (video/audio/img no browser).',
     });
   }
 
@@ -691,10 +810,5 @@ filesRoutes.get('/download/direct/:fileId', async (c) => {
   }
 
   await logDownload(c.env.DB, user.uid, fileId);
-
-  const headers = new Headers();
-  object.writeHttpMetadata(headers);
-  headers.set('Content-Disposition', `attachment; filename="${row.name}"`);
-
-  return new Response(object.body, { headers });
+  return streamR2Download(c, row);
 });

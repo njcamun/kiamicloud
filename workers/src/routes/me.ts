@@ -6,7 +6,7 @@ import { requireAuth } from '../middleware/auth';
 
 import { rateLimitByUser } from '../middleware/rate-limit';
 
-import { buildUserExport, deleteUserAccount } from '../db/user_account';
+import { deleteUserAccount } from '../db/user_account';
 
 import { ensureUser, getUserProfileWithOverrides } from '../db/users';
 
@@ -103,7 +103,6 @@ meRoutes.get('/', async (c) => {
     ? {
         canUpload: true,
         canDownload: true,
-        canShare: true,
         status: 'active',
         effectiveStatus: 'active',
         blockReason: null,
@@ -141,28 +140,6 @@ meRoutes.get('/', async (c) => {
     200,
     { 'Cache-Control': 'no-store' },
   );
-});
-
-
-
-/** Export GDPR — metadados da conta (JSON). */
-
-meRoutes.get('/export', async (c) => {
-
-  const user = c.get('user');
-
-  const payload = await buildUserExport(c.env.DB, user.uid);
-
-  const stamp = new Date().toISOString().slice(0, 10);
-
-  return c.json(payload, 200, {
-
-    'Content-Disposition': `attachment; filename="kiamicloud-export-${stamp}.json"`,
-
-    'Cache-Control': 'no-store',
-
-  });
-
 });
 
 

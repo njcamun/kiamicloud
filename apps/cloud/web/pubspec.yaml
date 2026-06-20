@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 0.6.0+3
 
 environment:
-  sdk: ^3.11.4
+  sdk: ">=3.5.0 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -44,7 +44,7 @@ dev_dependencies:
 flutter_launcher_icons:
   web:
     generate: true
-    image_path: "../../../branding/assets/icon.png"
+    image_path: "../../../packages/kiamicloud_core/assets/branding/icone.png"
     background_color: "#0D1B2A"
     theme_color: "#1565FF"
 

@@ -15,8 +15,18 @@ abstract final class KiamiGoogleSignIn {
   /// Regista implementação desktop e guarda o Client ID.
   static Future<void> registerDesktopIfNeeded({
     required String? desktopClientId,
+    String? webClientId,
   }) async {
-    if (kIsWeb) return;
+    if (kIsWeb) {
+      _clientId = _normalizeClientId(webClientId);
+      if (_clientId == null && kDebugMode) {
+        debugPrint(
+          '[KiamiGoogleSignIn] Web: Client ID OAuth em falta. '
+          'Configure google_oauth_client.dart e meta google-signin-client_id.',
+        );
+      }
+      return;
+    }
 
     final isDesktop = defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.macOS ||
@@ -46,10 +56,11 @@ abstract final class KiamiGoogleSignIn {
     }
   }
 
-  /// Instância [GoogleSignIn] com clientId no desktop quando configurado.
+  /// Instância [GoogleSignIn] com clientId quando configurado (web/desktop).
   static GoogleSignIn createInstance() {
-    if (_registered && _clientId != null) {
-      return GoogleSignIn(clientId: _clientId);
+    final id = _clientId;
+    if (id != null) {
+      return GoogleSignIn(clientId: id);
     }
     return GoogleSignIn();
   }

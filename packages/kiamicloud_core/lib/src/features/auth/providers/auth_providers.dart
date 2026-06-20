@@ -16,7 +16,6 @@ import '../../settings/settings_page.dart';
 import '../../settings/api_endpoint_settings_page.dart';
 import '../../billing/billing_page.dart';
 import '../../trash/trash_page.dart';
-import '../../shares/shares_page.dart';
 import '../../admin/admin_page.dart';
 import '../../admin/admin_checkouts_page.dart';
 import '../../admin/admin_subscriptions_page.dart';
@@ -137,10 +136,6 @@ final kiamiRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: KiamiRoutes.trash,
             builder: (context, state) => const TrashPage(),
-          ),
-          GoRoute(
-            path: KiamiRoutes.shares,
-            builder: (context, state) => const SharesPage(),
           ),
           GoRoute(
             path: KiamiRoutes.admin,

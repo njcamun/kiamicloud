@@ -1,13 +1,25 @@
 {
+    "id": "/",
     "name": "KiamiCloud",
     "short_name": "KiamiCloud",
-    "start_url": ".",
+    "description": "Minha Cloud. Meu mundo. Sem limites.",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
+    "display_override": [
+        "standalone",
+        "browser"
+    ],
     "background_color": "#0D1B2A",
     "theme_color": "#1565FF",
-    "description": "Minha Cloud. Meu mundo. Sem limites.",
-    "orientation": "portrait-primary",
+    "orientation": "any",
+    "lang": "pt-PT",
+    "dir": "ltr",
     "prefer_related_applications": false,
+    "categories": [
+        "productivity",
+        "utilities"
+    ],
     "icons": [
         {
             "src": "icons/Icon-192.png",

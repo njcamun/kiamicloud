@@ -1,0 +1,4 @@
+# melos_managed_dependency_overrides: kiamicloud_core
+dependency_overrides:
+  kiamicloud_core:
+    path: ..\\..\\..\\packages\\kiamicloud_core

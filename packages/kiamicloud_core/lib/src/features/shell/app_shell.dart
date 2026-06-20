@@ -9,6 +9,7 @@ import '../../widgets/beta_banner.dart';
 import '../../widgets/kiami_sidebar.dart';
 import '../../widgets/offline_banner.dart';
 import '../../widgets/upload_completion_listener.dart';
+import '../../pwa/pwa_install_banner.dart';
 
 /// Shell responsivo: sidebar navy (desktop) / conteudo integral (mobile).
 class AppShell extends ConsumerWidget {
@@ -27,31 +28,35 @@ class AppShell extends ConsumerWidget {
 
     if (isDesktop) {
       return UploadCompletionListener(
-        child: Scaffold(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          body: Row(
-            children: [
-              KiamiSidebar(),
-              Expanded(
-                child: BetaBanner(
-                  child: OfflineBanner(
-                    child: ColoredBox(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      child: child,
+        child: PwaInstallBanner(
+          child: Scaffold(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            body: Row(
+              children: [
+                KiamiSidebar(),
+                Expanded(
+                  child: BetaBanner(
+                    child: OfflineBanner(
+                      child: ColoredBox(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        child: child,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
     }
 
     return UploadCompletionListener(
-      child: Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: BetaBanner(child: OfflineBanner(child: child)),
+      child: PwaInstallBanner(
+        child: Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          body: BetaBanner(child: OfflineBanner(child: child)),
+        ),
       ),
     );
   }

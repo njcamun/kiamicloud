@@ -15,7 +15,6 @@ abstract final class KiamiRoutes {
   static const String legalAcceptance = '/legal-acceptance';
   static const String billing = '/billing';
   static const String trash = '/trash';
-  static const String shares = '/shares';
   static const String admin = '/admin';
   static const String adminCheckouts = '/admin/checkouts';
   static const String adminSubscriptions = '/admin/subscriptions';

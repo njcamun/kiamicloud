@@ -18,6 +18,7 @@ class KiamiUploadZone extends StatefulWidget {
     this.isLoading = false,
     this.progressCurrent = 0,
     this.progressTotal = 0,
+    this.uploadProgress = 0,
     this.cardWidth,
     this.maxPerFileLabel = KiamiConstants.maxUploadLabel,
   });
@@ -27,6 +28,8 @@ class KiamiUploadZone extends StatefulWidget {
   final bool isLoading;
   final int progressCurrent;
   final int progressTotal;
+  /// Progresso do ficheiro actual (0.0 – 1.0).
+  final double uploadProgress;
 
   /// Largura fixa do card (ex.: alinhada ao card de armazenamento no desktop).
   final double? cardWidth;
@@ -120,7 +123,7 @@ class _KiamiUploadZoneState extends State<KiamiUploadZone> {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: widget.isLoading ? null : widget.onTap,
+                onTap: (!widget.enabled || widget.isLoading) ? null : widget.onTap,
                 onHighlightChanged: widget.isLoading
                     ? null
                     : (v) => setState(() => _pressed = v),
@@ -244,8 +247,19 @@ class _KiamiUploadZoneState extends State<KiamiUploadZone> {
                                                           widget
                                                               .progressTotal,
                                                         )
-                                                      : KiamiStrings
-                                                          .uploadInProgress,
+                                                      : widget.uploadProgress > 0
+                                                          ? KiamiStrings
+                                                              .uploadProgressPercent(
+                                                              (widget.uploadProgress *
+                                                                      100)
+                                                                  .round()
+                                                                  .clamp(
+                                                                    0,
+                                                                    100,
+                                                                  ),
+                                                            )
+                                                          : KiamiStrings
+                                                              .uploadInProgress,
                                                   maxLines: 2,
                                                   overflow:
                                                       TextOverflow.ellipsis,
@@ -263,24 +277,18 @@ class _KiamiUploadZoneState extends State<KiamiUploadZone> {
                                   ],
                                 ),
                                 if (widget.isLoading)
-                                  Positioned.fill(
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.75),
-                                        borderRadius: BorderRadius.circular(
-                                          KiamiDecorations.radiusLg,
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: SizedBox(
-                                          width: (24 * scale).clamp(20, 32),
-                                          height: (24 * scale).clamp(20, 32),
-                                          child:
-                                              const CircularProgressIndicator(
-                                            strokeWidth: 2.5,
-                                          ),
-                                        ),
+                                  Positioned(
+                                    left: hPad,
+                                    right: hPad,
+                                    bottom: hPad * 0.5,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        minHeight: 5,
+                                        value: widget.uploadProgress > 0
+                                            ? widget.uploadProgress
+                                                .clamp(0.0, 1.0)
+                                            : null,
                                       ),
                                     ),
                                   ),

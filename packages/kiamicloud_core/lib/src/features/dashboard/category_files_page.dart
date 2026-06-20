@@ -18,11 +18,16 @@ import '../../widgets/kiami_search_bar.dart';
 import '../files/presentation/file_list_actions.dart';
 import '../files/presentation/file_list_sort.dart';
 import '../files/providers/files_providers.dart';
+import '../photos/presentation/photo_album_dialogs.dart';
+import '../photos/presentation/photos_grouped_sliver.dart';
+import '../photos/providers/photo_library_providers.dart';
 import '../../data/file_list_preferences.dart';
 
 import '../../theme/kiami_spacing.dart';
 
 enum _AudioQuickFilter { all, music, recordings }
+
+enum _PhotoQuickFilter { all, favorites }
 
 bool _matchesAudioFilter(KiamiFile file, _AudioQuickFilter filter) {
   if (filter == _AudioQuickFilter.all) return true;
@@ -52,6 +57,7 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
     with KiamiFileListActions {
   String _searchQuery = '';
   _AudioQuickFilter _audioFilter = _AudioQuickFilter.all;
+  _PhotoQuickFilter _photoFilter = _PhotoQuickFilter.all;
   FileListViewMode _viewMode = FileListViewMode.list;
   FileListSortOption _sortOption = FileListSortOption.nameAsc;
   final _searchController = TextEditingController();
@@ -94,6 +100,37 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
     });
   }
 
+  void _beginPhotoSelection(KiamiFile file) {
+    setState(() {
+      _selectionMode = true;
+      _selectedIds.add(file.id);
+    });
+  }
+
+  Future<void> _togglePhotoFavorite(KiamiFile file) async {
+    await ref.read(photoLibraryProvider.notifier).toggleFavorite(file.id);
+  }
+
+  Future<void> _createAlbumFromSelection(List<KiamiFile> visible) async {
+    final ids = visible.where((f) => _selectedIds.contains(f.id)).toList();
+    if (ids.isEmpty) return;
+    final name = await showCreatePhotoAlbumDialog(
+      context,
+      photoCount: ids.length,
+    );
+    if (name == null || name.isEmpty || !mounted) return;
+    await ref.read(photoLibraryProvider.notifier).createAlbum(
+          name,
+          ids.map((f) => f.id).toList(),
+        );
+    if (!mounted) return;
+    setState(() {
+      _selectedIds.clear();
+      _selectionMode = false;
+    });
+    showKiamiMessage(KiamiStrings.photoAddedToAlbum(name));
+  }
+
   Future<void> _deleteSelected(List<KiamiFile> visible) async {
     final selected =
         visible.where((f) => _selectedIds.contains(f.id)).toList();
@@ -128,6 +165,13 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
           .toList();
     }
 
+    if (widget.category == KiamiFileCategory.images &&
+        _photoFilter == _PhotoQuickFilter.favorites) {
+      final favorites =
+          ref.read(photoLibraryProvider).valueOrNull?.favorites ?? {};
+      files = files.where((f) => favorites.contains(f.id)).toList();
+    }
+
     return sortKiamiFiles(files, _sortOption);
   }
 
@@ -135,19 +179,18 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
     VoidCallback onDownload,
     VoidCallback onRename,
     VoidCallback onDelete,
-    VoidCallback onShare,
   }) _fileActions(KiamiFile file) => (
         onDownload: () => downloadKiamiFile(file),
         onRename: () => renameKiamiFile(file),
         onDelete: () => deleteKiamiFile(file),
-        onShare: () => shareKiamiFile(file),
       );
 
   int _gridCrossAxisCount(double width) => kiamiFileGridCrossAxisCount(width);
 
   @override
   Widget build(BuildContext context) {
-    final filesAsync = ref.watch(kiamiFilesProvider);
+    final filesAsync = ref.watch(kiamiFilesViewProvider);
+    ref.watch(photoLibraryProvider);
     final hPad = kiamiContentHorizontalPadding(context);
     final showBack = kiamiShowsShellBackButton(context);
 
@@ -165,6 +208,17 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
               : null,
           actions: [
             if (_selectionMode) ...[
+              if (widget.category == KiamiFileCategory.images)
+                IconButton(
+                  tooltip: KiamiStrings.photoSelectionCreateAlbum,
+                  icon: const Icon(Icons.photo_album_outlined),
+                  onPressed: () {
+                    final files = _prepareFiles(
+                      ref.read(kiamiFilesProvider).valueOrNull ?? [],
+                    );
+                    _createAlbumFromSelection(files);
+                  },
+                ),
               IconButton(
                 tooltip: KiamiStrings.selectionDelete,
                 icon: const Icon(Icons.delete_outline),
@@ -269,6 +323,35 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                                 ),
                               ),
                             ],
+                            if (widget.category == KiamiFileCategory.images) ...[
+                              const SizedBox(height: KiamiSpacing.sm),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    FilterChip(
+                                      label: Text(KiamiStrings.photosFilterAll),
+                                      selected:
+                                          _photoFilter == _PhotoQuickFilter.all,
+                                      onSelected: (_) => setState(
+                                        () => _photoFilter = _PhotoQuickFilter.all,
+                                      ),
+                                    ),
+                                    const SizedBox(width: KiamiSpacing.sm),
+                                    FilterChip(
+                                      label:
+                                          Text(KiamiStrings.photosFilterFavorites),
+                                      selected: _photoFilter ==
+                                          _PhotoQuickFilter.favorites,
+                                      onSelected: (_) => setState(
+                                        () => _photoFilter =
+                                            _PhotoQuickFilter.favorites,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: KiamiSpacing.md),
                             FileListToolbar(
                               viewMode: _viewMode,
@@ -294,7 +377,8 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                         child: KiamiEmptyState(
                           icon: widget.category.icon,
                           title: _searchQuery.isNotEmpty ||
-                                  _audioFilter != _AudioQuickFilter.all
+                                  _audioFilter != _AudioQuickFilter.all ||
+                                  _photoFilter != _PhotoQuickFilter.all
                               ? KiamiStrings.categorySearchEmpty
                               : KiamiStrings.categoryFilesEmpty,
                           iconColor: widget.category.accentColor,
@@ -353,6 +437,10 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
     double width,
     double hPad,
   ) {
+    if (widget.category == KiamiFileCategory.images) {
+      return _buildPhotosSliver(files, width, hPad);
+    }
+
     final hPadding = EdgeInsets.symmetric(horizontal: hPad);
     switch (_viewMode) {
       case FileListViewMode.list:
@@ -376,7 +464,6 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                   onDownload: actions.onDownload,
                   onRename: actions.onRename,
                   onDelete: actions.onDelete,
-                  onShare: actions.onShare,
                 );
               },
               childCount: files.length,
@@ -406,7 +493,6 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                   onDownload: actions.onDownload,
                   onRename: actions.onRename,
                   onDelete: actions.onDelete,
-                  onShare: actions.onShare,
                 );
               },
               childCount: files.length,
@@ -430,7 +516,6 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
                   onDownload: actions.onDownload,
                   onRename: actions.onRename,
                   onDelete: actions.onDelete,
-                  onShare: actions.onShare,
                 );
               },
               childCount: files.length,
@@ -438,5 +523,46 @@ class _CategoryFilesPageState extends ConsumerState<CategoryFilesPage>
           ),
         );
     }
+  }
+
+  Widget _buildPhotosSliver(
+    List<KiamiFile> files,
+    double width,
+    double hPad,
+  ) {
+    final favorites =
+        ref.read(photoLibraryProvider).valueOrNull?.favorites ?? {};
+
+    void openPhoto(KiamiFile file) => previewKiamiFile(
+          file,
+          filesInContext: files,
+        );
+
+    if (_viewMode == FileListViewMode.grid) {
+      return PhotosGroupedSliver.grid(
+        files: files,
+        crossAxisCount: _gridCrossAxisCount(width),
+        horizontalPadding: hPad,
+        favoriteIds: favorites,
+        selectionMode: _selectionMode,
+        selectedIds: _selectedIds,
+        onOpen: openPhoto,
+        onToggleFavorite: _togglePhotoFavorite,
+        onLongPressSelect: _beginPhotoSelection,
+        onSelectToggle: (file) => _toggleSelection(file.id),
+      );
+    }
+
+    return PhotosGroupedSliver.list(
+      files: files,
+      horizontalPadding: hPad,
+      favoriteIds: favorites,
+      selectionMode: _selectionMode,
+      selectedIds: _selectedIds,
+      onOpen: openPhoto,
+      onToggleFavorite: _togglePhotoFavorite,
+      onLongPressSelect: _beginPhotoSelection,
+      onSelectToggle: (file) => _toggleSelection(file.id),
+    );
   }
 }
