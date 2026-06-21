@@ -34,7 +34,7 @@ import '../activity/account_notifications_popup.dart';
 import '../../utils/kiami_support_contact.dart';
 import '../../utils/kiami_layout.dart';
 import '../../utils/kiami_platform.dart';
-import '../../utils/kiami_web_file_picker.dart';
+import '../../utils/pick_files_for_upload.dart';
 import '../../utils/kiami_api_limits.dart';
 import '../activity/providers/profile_quota_sync_provider.dart';
 import '../backup/device_backup_flow.dart';
@@ -88,21 +88,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
 
   Future<void> _pickAndUpload() async {
     try {
-      final List<PlatformFile> files;
-      if (kIsWeb) {
-        final picked = await pickFilesWithWebInput(allowMultiple: true);
-        if (picked == null || picked.isEmpty) return;
-        files = picked;
-      } else {
-        final picked = await FilePicker.platform.pickFiles(
-          allowMultiple: true,
-          withData: false,
-          withReadStream: true,
-        );
-        if (picked == null || picked.files.isEmpty) return;
-        files = picked.files;
-      }
-      await _handlePickedFiles(files);
+      final picked = await pickFilesForUpload(allowMultiple: true);
+      if (picked == null || picked.isEmpty) return;
+      await _handlePickedFiles(picked);
     } catch (e, st) {
       if (!mounted) return;
       final report = buildEarlyUploadReport(

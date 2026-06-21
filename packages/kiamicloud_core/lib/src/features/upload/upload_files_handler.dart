@@ -335,6 +335,36 @@ Future<void> handleFilesForUpload({
 
         final path = _uploadPathForPlatformFile(normalized);
 
+        final effectiveSize = platformFileEffectiveSize(normalized);
+
+        if (platformFilePreferPathUpload(normalized)) {
+
+          UploadDebug.log(
+
+            'handleFiles: aceite $name via path ($effectiveSize bytes)',
+
+          );
+
+          toEnqueue.add(
+
+            (
+
+              name: name,
+
+              sizeBytes: effectiveSize,
+
+              path: path,
+
+              bytes: null,
+
+            ),
+
+          );
+
+          continue;
+
+        }
+
         List<int>? inMemory = normalized.bytes != null && normalized.bytes!.isNotEmpty
 
             ? List<int>.from(normalized.bytes!)
@@ -537,10 +567,9 @@ Future<void> handleFilesForUpload({
 
 String? _uploadPathForPlatformFile(PlatformFile file) {
   if (!kIsWeb) {
-    final path = file.path;
-    if (path != null && path.isNotEmpty) return path;
+    return platformFileLocalPath(file);
   }
-  if (kIsWeb && isWebFileRegistryRef(file.identifier)) {
+  if (isWebFileRegistryRef(file.identifier)) {
     return file.identifier;
   }
   return null;

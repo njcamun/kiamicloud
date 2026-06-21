@@ -12,7 +12,6 @@ import '../../utils/path_file_bytes.dart';
 import '../files/providers/files_providers.dart';
 import 'upload_failure_report.dart';
 import 'upload_debug.dart';
-import 'upload_diagnostic.dart';
 
 enum UploadQueueItemStatus {
   pending,
@@ -328,38 +327,66 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
         _resetProgressThrottle();
         _updateById(itemId, item);
 
-        List<int> bytes;
-        try {
-          bytes = await _loadBytes(item);
-        } catch (e, st) {
-          _markUploadFailed(
-            itemId: itemId,
-            item: item,
-            error: e,
-            stackTrace: st,
-            stage: 'read_bytes',
-            onFailed: () => sessionFailed += 1,
-          );
-          continue;
-        }
+        final nativePath = !kIsWeb &&
+            item.path != null &&
+            item.path!.isNotEmpty &&
+            !isWebFileRegistryRef(item.path);
 
         try {
-          await _ref.read(kiamiApiClientProvider).uploadFile(
-                name: item.name,
-                bytes: bytes,
-                mimeType: guessMimeType(item.name),
-                onProgress: (sent, total) {
-                  if (total <= 0) return;
-                  final pct = (sent / total).clamp(0.0, 1.0);
-                  if (!_shouldEmitProgress(pct)) return;
-                  final current = _findById(itemId);
-                  if (current == null ||
-                      current.status != UploadQueueItemStatus.uploading) {
-                    return;
-                  }
-                  _updateById(itemId, current.copyWith(progress: pct));
-                },
+          if (nativePath) {
+            UploadDebug.log(
+              'transfer PATH ${item.sizeBytes} bytes → ${item.path}',
+            );
+            await _ref.read(kiamiApiClientProvider).uploadFilePath(
+                  name: item.name,
+                  filePath: item.path!,
+                  sizeBytes: item.sizeBytes,
+                  mimeType: guessMimeType(item.name),
+                  onProgress: (sent, total) {
+                    if (total <= 0) return;
+                    final pct = (sent / total).clamp(0.0, 1.0);
+                    if (!_shouldEmitProgress(pct)) return;
+                    final current = _findById(itemId);
+                    if (current == null ||
+                        current.status != UploadQueueItemStatus.uploading) {
+                      return;
+                    }
+                    _updateById(itemId, current.copyWith(progress: pct));
+                  },
+                );
+          } else {
+            List<int> bytes;
+            try {
+              bytes = await _loadBytes(item);
+            } catch (e, st) {
+              _markUploadFailed(
+                itemId: itemId,
+                item: item,
+                error: e,
+                stackTrace: st,
+                stage: 'read_bytes',
+                onFailed: () => sessionFailed += 1,
               );
+              continue;
+            }
+
+            await _ref.read(kiamiApiClientProvider).uploadFile(
+                  name: item.name,
+                  bytes: bytes,
+                  mimeType: guessMimeType(item.name),
+                  onProgress: (sent, total) {
+                    if (total <= 0) return;
+                    final pct = (sent / total).clamp(0.0, 1.0);
+                    if (!_shouldEmitProgress(pct)) return;
+                    final current = _findById(itemId);
+                    if (current == null ||
+                        current.status != UploadQueueItemStatus.uploading) {
+                      return;
+                    }
+                    _updateById(itemId, current.copyWith(progress: pct));
+                  },
+                );
+          }
           sessionSucceeded += 1;
           if (kIsWeb && isWebFileRegistryRef(item.path)) {
             consumeWebFileRegistryRef(item.path!);

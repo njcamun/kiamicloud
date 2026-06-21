@@ -431,38 +431,98 @@ class KiamiApiClient {
     UploadProgressCallback? onProgress,
   }) async {
     final resolvedMime = mimeType ?? 'application/octet-stream';
-    final init = await initUpload(
-      name: name,
-      sizeBytes: sizeBytes,
-      mimeType: resolvedMime,
-    );
+    final initUrl = _uri('/files/upload/init').toString();
+
+    late final UploadInitResult init;
+    try {
+      UploadDebug.log('init POST $initUrl ($sizeBytes bytes, $name) [path]');
+      init = await initUpload(
+        name: name,
+        sizeBytes: sizeBytes,
+        mimeType: resolvedMime,
+      );
+      UploadDebug.log('init OK fileId=${init.fileId}');
+    } catch (e, st) {
+      UploadDebug.fail('init', e, stackTrace: st);
+      throw _uploadStageFailure(
+        stage: 'init',
+        fileName: name,
+        fileSizeBytes: sizeBytes,
+        cause: e,
+        stackTrace: st,
+        requestUrl: initUrl,
+        httpMethod: 'POST',
+      );
+    }
 
     final viaWorker = kIsWeb || init.localDevUpload;
     final putUrl = viaWorker
         ? _uri('/files/upload/direct/${init.fileId}').toString()
         : init.uploadUrl;
 
-    final putResponse = await _putUploadFile(
-      path: filePath,
-      sizeBytes: sizeBytes,
-      url: putUrl,
-      contentType: resolvedMime,
-      useAuth: viaWorker,
-      onProgress: onProgress,
+    UploadDebug.log(
+      'transfer PUT $sizeBytes bytes → $putUrl [path]',
     );
 
-    if (putResponse.statusCode < 200 || putResponse.statusCode >= 300) {
-      _throwUploadPutFailure(putResponse);
-    }
+    try {
+      final putResponse = await _putUploadFile(
+        path: filePath,
+        sizeBytes: sizeBytes,
+        url: putUrl,
+        contentType: resolvedMime,
+        useAuth: viaWorker,
+        onProgress: onProgress,
+      );
 
-    KiamiFile uploaded;
-    if (viaWorker) {
-      uploaded = _parseUploadPutFile(putResponse);
-    } else {
-      uploaded = await completeUpload(init.fileId);
-    }
+      UploadDebug.log(
+        'transfer resposta status=${putResponse.statusCode} '
+        'body=${putResponse.body.length} chars',
+      );
 
-    return uploaded;
+      if (putResponse.statusCode < 200 || putResponse.statusCode >= 300) {
+        try {
+          _throwUploadPutFailure(putResponse);
+        } catch (e, st) {
+          throw _uploadStageFailure(
+            stage: 'transfer',
+            fileName: name,
+            fileSizeBytes: sizeBytes,
+            cause: e,
+            stackTrace: st,
+            fileId: init.fileId,
+            requestUrl: putUrl,
+            httpMethod: 'PUT',
+            statusCode: putResponse.statusCode,
+            errorCode: e is KiamiApiException ? e.errorCode : null,
+            responseBody: putResponse.body,
+          );
+        }
+      }
+
+      KiamiFile uploaded;
+      if (viaWorker) {
+        uploaded = _parseUploadPutFile(putResponse);
+      } else {
+        uploaded = await completeUpload(init.fileId);
+      }
+
+      return uploaded;
+    } catch (e, st) {
+      if (e is UploadFailureException) rethrow;
+      throw _uploadStageFailure(
+        stage: 'transfer',
+        fileName: name,
+        fileSizeBytes: sizeBytes,
+        cause: e,
+        stackTrace: st,
+        fileId: init.fileId,
+        requestUrl: putUrl,
+        httpMethod: 'PUT',
+        statusCode: e is KiamiApiException ? e.statusCode : null,
+        errorCode: e is KiamiApiException ? e.errorCode : null,
+        responseBody: e is KiamiApiException ? e.message : null,
+      );
+    }
   }
 
   Future<http.Response> _putUploadFile({

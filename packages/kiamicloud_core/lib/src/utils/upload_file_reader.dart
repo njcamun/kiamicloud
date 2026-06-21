@@ -51,6 +51,15 @@ bool platformFileHasSource(PlatformFile file) {
 }
 
 /// Caminho local — nunca aceder a [PlatformFile.path] na Web (lança excepção).
+String? platformFileLocalPath(PlatformFile file) => _platformFilePath(file);
+
+/// True quando o upload pode usar path + streaming (Android/desktop).
+bool platformFilePreferPathUpload(PlatformFile file) {
+  if (kIsWeb) return false;
+  final path = _platformFilePath(file);
+  return path != null && path.isNotEmpty && platformFileEffectiveSize(file) > 0;
+}
+
 String? _platformFilePath(PlatformFile file) {
   if (kIsWeb) return null;
   return file.path;
