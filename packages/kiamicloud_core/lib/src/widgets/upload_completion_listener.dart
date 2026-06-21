@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../app/kiami_app_keys.dart';
 import '../constants/kiami_strings.dart';
+import '../features/upload/upload_diagnostic.dart';
 import '../features/upload/upload_queue.dart';
 
 /// Notifica o utilizador quando a fila de uploads termina um ciclo.
@@ -14,30 +16,54 @@ class UploadCompletionListener extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen<UploadBatchResult?>(uploadBatchResultProvider, (previous, next) {
       if (next == null) return;
-      final messenger = ScaffoldMessenger.maybeOf(context);
-      if (messenger == null) return;
 
       final queue = ref.read(uploadQueueProvider);
       final firstFailed = queue.items
           .where((i) => i.status == UploadQueueItemStatus.failed)
-          .map((i) => i.errorMessage)
-          .whereType<String>()
           .firstOrNull;
+      final firstFailedMessage = firstFailed?.errorMessage;
+      final firstFailedReport = firstFailed?.errorReport;
 
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            next.failed > 0 && firstFailed != null
-                ? '${KiamiStrings.uploadBackgroundComplete(next.succeeded, next.failed)} $firstFailed'
-                : KiamiStrings.uploadBackgroundComplete(
-                    next.succeeded,
-                    next.failed,
-                  ),
+      final messenger = kiamiScaffoldMessengerKey.currentState;
+      if (messenger != null) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              next.failed > 0 && firstFailedMessage != null
+                  ? '${KiamiStrings.uploadBackgroundComplete(next.succeeded, next.failed)} $firstFailedMessage'
+                  : KiamiStrings.uploadBackgroundComplete(
+                      next.succeeded,
+                      next.failed,
+                    ),
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: next.failed > 0 ? 20 : 4),
+            action: next.failed > 0 && firstFailedReport != null
+                ? SnackBarAction(
+                    label: KiamiStrings.uploadSnackCopyError,
+                    onPressed: () {
+                      presentUploadDiagnostic(
+                        context,
+                        report: firstFailedReport,
+                        ref: ref,
+                      );
+                    },
+                  )
+                : null,
           ),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: next.failed > 0 ? 8 : 4),
-        ),
-      );
+        );
+      }
+
+      if (next.failed > 0 && firstFailedReport != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          presentUploadDiagnostic(
+            context,
+            report: firstFailedReport,
+            ref: ref,
+          );
+        });
+      }
+
       ref.read(uploadBatchResultProvider.notifier).state = null;
     });
 

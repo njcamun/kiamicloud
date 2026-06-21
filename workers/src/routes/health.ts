@@ -53,6 +53,19 @@ healthRoutes.get('/', async (c) => {
   );
 
   const degraded = database === 'error' || database === 'timeout';
+  const env = c.env.ENVIRONMENT ?? 'unknown';
+  const isRestrictedHealth = env === 'beta' || env === 'production';
+
+  if (isRestrictedHealth) {
+    return c.json({
+      status: degraded ? 'degraded' : 'ok',
+      service: 'kiamicloud-api',
+      version: API_VERSION,
+      environment: env,
+      database: database === 'ok' ? 'ok' : 'degraded',
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   return c.json({
     status: degraded ? 'degraded' : 'ok',

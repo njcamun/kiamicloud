@@ -10,8 +10,8 @@ Future<void> main() async {
   await kiamiBootstrap(
     firebaseOptions: DefaultFirebaseOptions.currentPlatform,
     googleDesktopClientId: GoogleOAuthClient.desktopClientId,
-    environment: KiamiAppEnvironment.beta,
-    apiBaseUrl: KiamiConstants.cloudBetaApiBaseUrl,
+    environment: KiamiAppEnvironment.production,
+    apiBaseUrl: KiamiConstants.cloudProdApiBaseUrl,
   );
   runApp(
     const ProviderScope(

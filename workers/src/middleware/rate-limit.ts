@@ -3,7 +3,7 @@ import type { AppVariables, Env } from '../types';
 import { RATE_LIMITS } from '../config/rate-limits';
 import { checkRateLimit } from '../db/rate-limit';
 import { logSecurityEvent } from '../db/security';
-import { getClientIp, hashIp } from '../lib/client-ip';
+import { getClientIp, getIpHashPepper, hashIp } from '../lib/client-ip';
 
 /** Rate limit global por IP (antes de auth). */
 export const rateLimitByIp = createMiddleware<{ Bindings: Env }>(
@@ -25,7 +25,7 @@ export const rateLimitByIp = createMiddleware<{ Bindings: Env }>(
     );
 
     if (!result.allowed) {
-      const ipHash = await hashIp(ip);
+      const ipHash = await hashIp(ip, getIpHashPepper(c.env));
       c.executionCtx.waitUntil(
         logSecurityEvent(db, {
           eventType: 'rate_limited',

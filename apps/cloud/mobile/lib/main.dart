@@ -7,8 +7,8 @@ import 'firebase_options.dart';
 Future<void> main() async {
   await kiamiBootstrap(
     firebaseOptions: DefaultFirebaseOptions.currentPlatform,
-    environment: KiamiAppEnvironment.beta,
-    apiBaseUrl: KiamiConstants.cloudBetaApiBaseUrl,
+    environment: KiamiAppEnvironment.production,
+    apiBaseUrl: KiamiConstants.cloudProdApiBaseUrl,
   );
   runApp(
     const ProviderScope(

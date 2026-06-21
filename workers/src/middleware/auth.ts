@@ -1,7 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import type { AppVariables, AuthUser, Env } from '../types';
 import { verifyFirebaseIdToken } from '../lib/firebase-jwt';
-import { getClientIp, hashIp } from '../lib/client-ip';
+import { getClientIp, getIpHashPepper, hashIp } from '../lib/client-ip';
 import { logSecurityEvent } from '../db/security';
 import { checkRateLimit } from '../db/rate-limit';
 import { RATE_LIMITS } from '../config/rate-limits';
@@ -54,7 +54,7 @@ export const requireAuth = createMiddleware<{
     const db = c.env.DB;
     if (db) {
       const ip = getClientIp(c);
-      const ipHash = await hashIp(ip);
+      const ipHash = await hashIp(ip, getIpHashPepper(c.env));
       const failBucket = `ip:${ip}:auth_fail`;
       const failRl = await checkRateLimit(
         db,

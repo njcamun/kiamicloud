@@ -15,7 +15,10 @@ import '../../utils/format_bytes.dart';
 import '../../theme/kiami_spacing.dart';
 import '../../widgets/global_file_search.dart';
 import '../../widgets/upload_drop_target.dart';
+import '../../widgets/upload_diagnostic_banner.dart';
+import '../../widgets/upload_failure_banner.dart';
 import '../../widgets/upload_queue_panel.dart';
+import '../upload/upload_diagnostic.dart';
 import '../upload/upload_files_handler.dart';
 import '../upload/upload_queue.dart';
 import '../../widgets/kiami_api_unavailable_card.dart';
@@ -100,9 +103,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
         files = picked.files;
       }
       await _handlePickedFiles(files);
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      showKiamiMessage(kiamiApiErrorMessage(e));
+      final report = buildEarlyUploadReport(
+        stage: 'picker',
+        message: uploadHandlerErrorMessage(e),
+        error: e,
+        stackTrace: st,
+      );
+      await presentUploadDiagnostic(context, report: report, ref: ref);
+      showKiamiMessage(uploadHandlerErrorMessage(e));
     }
   }
 
@@ -152,6 +162,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
       }
     }
     final uploadProgress = uploadingItem?.progress ?? 0.0;
+    final uploadBatchTotal = queueState.items.length;
+    final uploadBatchCurrent = uploadingItem == null
+        ? 0
+        : queueState.items.indexWhere((i) => i.id == uploadingItem!.id) + 1;
     final allFiles = filesAsync.valueOrNull ?? const <KiamiFile>[];
     final isWide = kiamiIsWideLayout(context);
     final isNativeDesktop = kiamiIsNativeDesktop();
@@ -277,6 +291,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                                   showNoConnectOnUpload: showNoConnectOnUpload,
                                   queueProcessing: queueState.isProcessing,
                                   uploadProgress: uploadProgress,
+                                  uploadBatchCurrent: uploadBatchCurrent,
+                                  uploadBatchTotal: uploadBatchTotal,
                                   fullWidthUpload:
                                       isNativeDesktop && isWide,
                                   fixedStorageCard: fixedStorageOnMobile,
@@ -284,10 +300,23 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                                       ? () => showKiamiMessage(
                                             KiamiStrings.uploadProfileLoading,
                                           )
-                                      : profileAsync.hasError
-                                          ? () => showKiamiMessage(
-                                                KiamiStrings.apiUnavailableTitle,
-                                              )
+                                  : profileAsync.hasError
+                                      ? () async {
+                                          final err = profileAsync.error!;
+                                          final report = buildEarlyUploadReport(
+                                            stage: 'profile_error',
+                                            message: kiamiApiErrorMessage(err),
+                                            error: err,
+                                          );
+                                          await presentUploadDiagnostic(
+                                            context,
+                                            report: report,
+                                            ref: ref,
+                                          );
+                                          showKiamiMessage(
+                                            KiamiStrings.apiUnavailableTitle,
+                                          );
+                                        }
                                           : _pickAndUpload,
                                   onFilesDropped: profileAsync.isLoading ||
                                           profileAsync.hasError
@@ -298,6 +327,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                                         KiamiConstants.maxUploadBytes,
                                   ),
                                 ),
+                                const UploadDiagnosticBanner(),
+                                const UploadFailureBanner(),
                                 const UploadQueuePanel(),
                               ],
                             ),
@@ -391,6 +422,8 @@ class _DashboardTopSection extends StatelessWidget {
     required this.showNoConnectOnUpload,
     required this.queueProcessing,
     required this.uploadProgress,
+    required this.uploadBatchCurrent,
+    required this.uploadBatchTotal,
     required this.fullWidthUpload,
     required this.fixedStorageCard,
     required this.onPickUpload,
@@ -405,6 +438,8 @@ class _DashboardTopSection extends StatelessWidget {
   final String maxPerFileLabel;
   final bool queueProcessing;
   final double uploadProgress;
+  final int uploadBatchCurrent;
+  final int uploadBatchTotal;
   final bool fullWidthUpload;
   final bool fixedStorageCard;
   final VoidCallback onPickUpload;
@@ -414,7 +449,7 @@ class _DashboardTopSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = profile;
     final uploadEnabled =
-        !queueProcessing && !profileLoading && !profileError && p != null;
+        !profileLoading && !profileError && p != null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
@@ -471,11 +506,12 @@ class _DashboardTopSection extends StatelessWidget {
                 onFilesDropped: onFilesDropped,
                 child: KiamiUploadZone(
                   isLoading: queueProcessing,
+                  blockTapWhileLoading: false,
                   enabled: uploadEnabled,
                   onTap: onPickUpload,
                   uploadProgress: uploadProgress,
-                  progressCurrent: 0,
-                  progressTotal: 0,
+                  progressCurrent: uploadBatchCurrent,
+                  progressTotal: uploadBatchTotal,
                   cardWidth: cardWidth,
                   maxPerFileLabel: maxPerFileLabel,
                 ),

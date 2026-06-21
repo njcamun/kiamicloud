@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AppVariables, Env } from '../types';
 import { requireAuth } from '../middleware/auth';
+import { requireEmailVerified } from '../middleware/require-email-verified';
 import { rateLimitByUser } from '../middleware/rate-limit';
 import { formatMaxFileSizeMessage } from '../config/plans';
 import {
@@ -20,7 +22,7 @@ import {
 import { deleteR2Objects } from '../lib/delete-r2-keys';
 import { isThumbnailSource } from '../lib/image-mime';
 import { buildThumbR2ObjectKey } from '../lib/r2-keys';
-import { sanitizeFileName } from '../lib/sanitize';
+import { contentDispositionInline, sanitizeFileName } from '../lib/sanitize';
 import { isLocalUnlimitedMode } from '../lib/local_unlimited';
 import { canPresignR2, presignGet, presignPut } from '../lib/r2-presign';
 import { isBrowserClientOrigin } from '../middleware/cors';
@@ -30,6 +32,7 @@ import {
   verifyMediaAccessToken,
 } from '../lib/media-access-token';
 import { resolveSubscriptionAccessForUser } from '../db/subscriptions';
+import { ensureUser } from '../db/users';
 import { subscriptionBlockMessage } from '../lib/subscription-access';
 
 export const filesRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -75,7 +78,7 @@ async function streamR2Download(
 
   const headers = new Headers();
   object.writeHttpMetadata(headers);
-  headers.set('Content-Disposition', `inline; filename="${row.name}"`);
+  headers.set('Content-Disposition', contentDispositionInline(row.name));
   headers.set('Accept-Ranges', 'bytes');
   headers.set('Cache-Control', 'private, max-age=3600');
 
@@ -101,7 +104,10 @@ async function streamR2Download(
         }
         const partialHeaders = new Headers(headers);
         ranged.writeHttpMetadata(partialHeaders);
-        partialHeaders.set('Content-Disposition', `inline; filename="${row.name}"`);
+        partialHeaders.set(
+          'Content-Disposition',
+          contentDispositionInline(row.name),
+        );
         partialHeaders.set('Accept-Ranges', 'bytes');
         partialHeaders.set('Content-Range', `bytes ${start}-${end}/${size}`);
         partialHeaders.set('Content-Length', String(end - start + 1));
@@ -194,6 +200,7 @@ filesRoutes.get('/thumbnail/media/:fileId', async (c) => {
 });
 
 filesRoutes.use('/*', requireAuth);
+filesRoutes.use('/*', requireEmailVerified);
 filesRoutes.use('/*', rateLimitByUser);
 
 /** Lista ficheiros activos do utilizador. */
@@ -222,6 +229,8 @@ filesRoutes.post('/upload/init', async (c) => {
     mimeType?: string;
     folderId?: string;
   }>();
+
+  await ensureUser(c.env.DB, user);
 
   const name = body.name?.trim();
   const sizeBytes = body.sizeBytes;
@@ -325,7 +334,7 @@ filesRoutes.post('/upload/init', async (c) => {
     fileId,
     file,
     uploadUrl,
-    method: 'PUT',
+    method: viaWorker ? 'POST' : 'PUT',
     r2ObjectKey,
     expiresAt: expires?.expiresAt ?? null,
     expiresInSeconds: expires?.expiresInSeconds ?? null,
@@ -333,15 +342,21 @@ filesRoutes.post('/upload/init', async (c) => {
     thumbnail,
     instructions: expires
       ? 'Envie PUT para uploadUrl sem Authorization. Depois POST /files/upload/complete.'
-      : 'PUT para uploadUrl com Authorization Bearer (proxy Worker). O ficheiro e activado na resposta.',
+      : 'POST ou PUT para uploadUrl com Authorization Bearer (proxy Worker). O ficheiro e activado na resposta.',
   });
 });
 
 /**
  * Upload directo via Worker (dev local ou Flutter Web — evita CORS no R2).
  * Em mobile/desktop nativo usar URL pre-assinada de upload/init.
+ * POST e PUT — Flutter Web usa POST (alguns browsers/rede bloqueiam PUT).
  */
-filesRoutes.put('/upload/direct/:fileId', async (c) => {
+async function handleDirectFileUpload(
+  c: Context<{ Bindings: Env; Variables: AppVariables }>,
+) {
+  const blocked = await enforceSubscriptionAccess(c, 'upload');
+  if (blocked) return blocked;
+
   const user = c.get('user');
   const fileId = c.req.param('fileId');
   const row = await getFileById(c.env.DB, fileId, user.uid);
@@ -358,13 +373,30 @@ filesRoutes.put('/upload/direct/:fileId', async (c) => {
   }
 
   const contentLength = c.req.header('Content-Length');
-  const declaredSize = Number(contentLength);
-  if (
-    contentLength &&
-    (!Number.isFinite(declaredSize) || declaredSize > row.size_bytes)
-  ) {
+  const env = c.env.ENVIRONMENT ?? 'development';
+
+  let declaredSize = row.size_bytes;
+  if (contentLength?.trim()) {
+    const parsed = Number(contentLength);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return c.json(
+        { error: 'invalid_request', message: 'Content-Length invalido.' },
+        400,
+      );
+    }
+    if (parsed > row.size_bytes) {
+      return c.json(
+        { error: 'invalid_request', message: 'Tamanho do corpo excede o declarado.' },
+        400,
+      );
+    }
+    declaredSize = parsed;
+  } else if (env !== 'beta' && env !== 'production') {
     return c.json(
-      { error: 'invalid_request', message: 'Tamanho do corpo excede o declarado.' },
+      {
+        error: 'invalid_request',
+        message: 'Cabecalho Content-Length obrigatorio.',
+      },
       400,
     );
   }
@@ -382,7 +414,7 @@ filesRoutes.put('/upload/direct/:fileId', async (c) => {
   });
 
   const head = await c.env.FILES_BUCKET.head(row.r2_object_key);
-  const actualSize = head?.size ?? row.size_bytes;
+  const actualSize = head?.size ?? declaredSize;
 
   const file = await activateFile(c.env.DB, {
     fileId,
@@ -394,10 +426,15 @@ filesRoutes.put('/upload/direct/:fileId', async (c) => {
     file,
     message: 'Upload concluido (modo directo / dev).',
   });
-});
+}
+
+filesRoutes.put('/upload/direct/:fileId', (c) => handleDirectFileUpload(c));
+filesRoutes.post('/upload/direct/:fileId', (c) => handleDirectFileUpload(c));
 
 /** Upload directo da miniatura (dev local). */
-filesRoutes.put('/upload/thumb/direct/:fileId', async (c) => {
+async function handleDirectThumbUpload(
+  c: Context<{ Bindings: Env; Variables: AppVariables }>,
+) {
   const user = c.get('user');
   const fileId = c.req.param('fileId');
   const row = await getFileById(c.env.DB, fileId, user.uid);
@@ -440,7 +477,10 @@ filesRoutes.put('/upload/thumb/direct/:fileId', async (c) => {
   }
 
   return c.json({ file, message: 'Miniatura guardada.' });
-});
+}
+
+filesRoutes.put('/upload/thumb/direct/:fileId', (c) => handleDirectThumbUpload(c));
+filesRoutes.post('/upload/thumb/direct/:fileId', (c) => handleDirectThumbUpload(c));
 
 /** Confirma miniatura apos PUT na URL pre-assinada. */
 filesRoutes.post('/upload/thumb/complete', async (c) => {
@@ -489,6 +529,9 @@ filesRoutes.post('/upload/thumb/complete', async (c) => {
 
 /** Confirma upload apos PUT na URL pre-assinada R2. */
 filesRoutes.post('/upload/complete', async (c) => {
+  const blocked = await enforceSubscriptionAccess(c, 'upload');
+  if (blocked) return blocked;
+
   const user = c.get('user');
   const body = await c.req.json<{ fileId?: string }>();
   const fileId = body.fileId?.trim();
@@ -696,6 +739,15 @@ filesRoutes.get('/:fileId/thumbnail', async (c) => {
       fileId,
       kind: 'thumbnail',
     });
+    if (!media) {
+      return c.json(
+        {
+          error: 'server_misconfigured',
+          message: 'MEDIA_TOKEN_SECRET nao configurado.',
+        },
+        500,
+      );
+    }
     return c.json({
       thumbnailUrl: `${origin}/files/thumbnail/media/${fileId}?token=${encodeURIComponent(media.token)}`,
       expiresAt: media.expiresAt,
@@ -761,6 +813,15 @@ filesRoutes.get('/:fileId/download', async (c) => {
       fileId,
       kind: 'download',
     });
+    if (!media) {
+      return c.json(
+        {
+          error: 'server_misconfigured',
+          message: 'MEDIA_TOKEN_SECRET nao configurado.',
+        },
+        500,
+      );
+    }
     await logDownload(c.env.DB, user.uid, fileId);
     return c.json({
       fileId,

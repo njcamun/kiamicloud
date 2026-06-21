@@ -32,6 +32,12 @@ class UnconfiguredAuthRepository implements AuthRepository {
   Future<void> sendPasswordResetEmail({required String email}) => _fail();
 
   @override
+  Future<void> sendEmailVerification() => _fail();
+
+  @override
+  Future<void> reloadCurrentUser() => _fail();
+
+  @override
   Future<KiamiUser> signInWithGoogle() => _fail();
 
   @override

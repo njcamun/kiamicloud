@@ -50,7 +50,27 @@ class FirebaseAuthRepository implements AuthRepository {
       email: email.trim(),
       password: password,
     );
-    return _requireUser(credential.user);
+    final user = credential.user;
+    if (user != null && !user.emailVerified) {
+      await user.sendEmailVerification();
+    }
+    return _requireUser(user);
+  }
+
+  @override
+  Future<void> sendEmailVerification() async {
+    _ensureConfigured();
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(code: 'user-not-found');
+    }
+    await user.sendEmailVerification();
+  }
+
+  @override
+  Future<void> reloadCurrentUser() async {
+    _ensureConfigured();
+    await _auth.currentUser?.reload();
   }
 
   @override

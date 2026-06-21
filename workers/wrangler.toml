@@ -10,13 +10,8 @@ ENVIRONMENT = "development"
 R2_BUCKET_NAME = "kiamicloud-files-prod"
 R2_PRESIGN_EXPIRES_SECONDS = "900"
 PAYMENTS_ENABLED = "true"
-# Coloque o seu Firebase UID (Definicoes → copiar token / Firebase console)
-ADMIN_UIDS = "OR8Of13d7mZSXok1xzwgZ9r6RAC2,TMEMjDUmZjhr39BjYkbsGeSKFpN2"
-# Consola Blade (LAN) — credenciais locais
-BLADE_CONSOLE_USER = "admin"
-BLADE_CONSOLE_PASSWORD = "admin"
-# Definir em producao: wrangler secret put PAYMENT_WEBHOOK_SECRET
-# PAYMENT_WEBHOOK_SECRET = "dev-only-change-me"
+# Credenciais locais: copiar workers/.dev.vars.example → .dev.vars
+# ADMIN_UIDS, BLADE_CONSOLE_*, PAYMENT_WEBHOOK_SECRET, MEDIA_TOKEN_SECRET, SECURITY_IP_PEPPER
 # API_ALLOWED_ORIGINS = "https://app.kiamicloud.com"
 
 [dev]
@@ -28,7 +23,6 @@ ip = "0.0.0.0"
 [[d1_databases]]
 binding = "DB"
 database_name = "kiamicloud-db"
-# Substituir apos: npx wrangler d1 create kiamicloud-db
 database_id = "1bdb62ef-9390-41bb-93f2-5c4d095bea92"
 migrations_dir = "../database/migrations"
 
@@ -42,6 +36,14 @@ bucket_name = "kiamicloud-files-prod"
 crons = ["0 4 * * *"]
 
 # --- Ambiente beta (deploy: wrangler deploy --env beta) ---
+# RETENCAO: dados beta podem ser apagados apos 2026-07-20 — ver scripts/purge-beta-retention.ps1
+# IMPORTANTE: beta deve usar D1 separado de producao.
+#   npx wrangler d1 create kiamicloud-db-beta
+#   npx wrangler d1 migrations apply kiamicloud-db-beta --remote --env beta
+#   Actualizar database_id abaixo e definir secrets:
+#   wrangler secret put ADMIN_UIDS --env beta
+#   wrangler secret put MEDIA_TOKEN_SECRET --env beta
+#   wrangler secret put PAYMENT_WEBHOOK_SECRET --env beta
 [env.beta]
 name = "kiamicloud-api-beta"
 workers_dev = true
@@ -51,15 +53,15 @@ ENVIRONMENT = "beta"
 FIREBASE_PROJECT_ID = "kiamicloud"
 PAYMENTS_ENABLED = "true"
 API_VERSION = "0.6.0-beta"
-ADMIN_UIDS = "OR8Of13d7mZSXok1xzwgZ9r6RAC2,TMEMjDUmZjhr39BjYkbsGeSKFpN2"
 R2_BUCKET_NAME = "kiamicloud-files-beta"
 R2_PRESIGN_EXPIRES_SECONDS = "900"
-API_ALLOWED_ORIGINS = "https://kiamicloud.web.app,https://kiamicloud.firebaseapp.com,http://localhost:8080,http://localhost:5000"
+API_ALLOWED_ORIGINS = "https://kiamicloud.web.app,https://kiamicloud.firebaseapp.com"
 
 [[env.beta.d1_databases]]
 binding = "DB"
-database_name = "kiamicloud-db"
-database_id = "1bdb62ef-9390-41bb-93f2-5c4d095bea92"
+database_name = "kiamicloud-db-beta"
+# Substituir apos: npx wrangler d1 create kiamicloud-db-beta
+database_id = "8f24fc4a-becc-46c8-b852-441bc182e140"
 migrations_dir = "../database/migrations"
 
 [[env.beta.r2_buckets]]
@@ -70,6 +72,11 @@ bucket_name = "kiamicloud-files-beta"
 crons = ["0 3 * * *", "0 4 * * *"]
 
 # --- Producao (deploy: wrangler deploy --env production) ---
+# Secrets obrigatorios (nao commitar):
+#   wrangler secret put ADMIN_UIDS --env production
+#   wrangler secret put MEDIA_TOKEN_SECRET --env production
+#   wrangler secret put PAYMENT_WEBHOOK_SECRET --env production
+#   wrangler secret put SECURITY_IP_PEPPER --env production
 [env.production]
 name = "kiamicloud-api"
 
@@ -78,7 +85,6 @@ ENVIRONMENT = "production"
 FIREBASE_PROJECT_ID = "kiamicloud"
 PAYMENTS_ENABLED = "true"
 API_VERSION = "0.6.0"
-ADMIN_UIDS = "OR8Of13d7mZSXok1xzwgZ9r6RAC2,TMEMjDUmZjhr39BjYkbsGeSKFpN2"
 R2_BUCKET_NAME = "kiamicloud-files-prod"
 R2_PRESIGN_EXPIRES_SECONDS = "900"
 API_ALLOWED_ORIGINS = "https://kiamicloud.web.app,https://kiamicloud.firebaseapp.com"

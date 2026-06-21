@@ -12,7 +12,7 @@ Uint8List? encodeThumbnailJpeg(List<int> bytes) {
 }
 
 Future<Uint8List?> encodeThumbnailJpegAsync(List<int> bytes) {
-  if (bytes.length < 4096) {
+  if (kIsWeb || bytes.length < 4096) {
     return Future.value(encodeThumbnailJpeg(bytes));
   }
   return compute(_encodeThumbnailJpegImpl, bytes);

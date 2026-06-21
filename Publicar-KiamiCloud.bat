@@ -2,6 +2,7 @@
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
+set "API_PROD_URL=https://kiamicloud-api.kiamicloud.workers.dev"
 set "API_BETA_URL=https://kiamicloud-api-beta.kiamicloud.workers.dev"
 set "WEB_APP_URL=https://kiamicloud.web.app"
 set "GITHUB_ACTIONS_URL=https://github.com/njcamun/kiamicloud/actions"
@@ -39,6 +40,7 @@ echo   KiamiCloud — Publicacao completa
 echo ============================================================
 echo   Web App .......... %WEB_APP_URL%
 echo   GitHub ........... https://github.com/njcamun/kiamicloud
+echo   API producao ..... %API_PROD_URL%
 echo   API beta ......... %API_BETA_URL%
 echo ============================================================
 echo.
@@ -507,7 +509,7 @@ goto MAIN
 :BUILD_MOBILE
 cls
 echo.
-echo === Build APK mobile beta ===
+echo === Build APK mobile producao ===
 echo.
 
 if "%HAS_FLUTTER%"=="0" (
@@ -516,17 +518,18 @@ if "%HAS_FLUTTER%"=="0" (
   goto MAIN
 )
 
-set /p API_URL=URL API beta [%API_BETA_URL%]: 
-if "!API_URL!"=="" set "API_URL=%API_BETA_URL%"
+set "API_URL=%API_PROD_URL%"
+set /p API_URL=URL API producao [%API_PROD_URL%]: 
+if "!API_URL!"=="" set "API_URL=%API_PROD_URL%"
 
 echo.
 echo Comando:
-echo   flutter build apk --dart-define=KIAMI_ENV=beta --dart-define=KIAMI_API_BASE_URL=!API_URL!
+echo   flutter build apk --dart-define=KIAMI_ENV=production --dart-define=KIAMI_API_BASE_URL=!API_URL!
 set /p BM=Confirma build? [S/N]: 
 if /i not "!BM!"=="S" goto MAIN
 
 pushd "%~dp0apps\cloud\mobile"
-call flutter build apk --dart-define=KIAMI_ENV=beta --dart-define=KIAMI_API_BASE_URL=!API_URL!
+call flutter build apk --dart-define=KIAMI_ENV=production --dart-define=KIAMI_API_BASE_URL=!API_URL!
 set BUILD_ERR=!ERRORLEVEL!
 popd
 

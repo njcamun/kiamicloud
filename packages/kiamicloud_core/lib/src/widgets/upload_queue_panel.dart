@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../constants/kiami_strings.dart';
 import '../features/upload/upload_queue.dart';
+import 'upload_error_report_dialog.dart';
 import '../utils/format_bytes.dart';
 
 /// Painel compacto da fila de uploads com barra de progresso por ficheiro.
@@ -50,7 +51,9 @@ class UploadQueuePanel extends ConsumerWidget {
               ...queue.items.take(6).map((item) {
                 final isUploading =
                     item.status == UploadQueueItemStatus.uploading;
+                final isFailed = item.status == UploadQueueItemStatus.failed;
                 final percent = (item.progress * 100).round().clamp(0, 100);
+                final report = item.errorReport;
 
                 return ListTile(
                   dense: true,
@@ -69,14 +72,28 @@ class UploadQueuePanel extends ConsumerWidget {
                             (isUploading
                                 ? KiamiStrings.uploadProgressPercent(percent)
                                 : formatBytes(item.sizeBytes)),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: item.status == UploadQueueItemStatus.failed
+                          color: isFailed
                               ? scheme.error
                               : scheme.onSurfaceVariant,
                         ),
                       ),
+                      if (isFailed && report != null) ...[
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () => showUploadErrorReportDialog(
+                              context,
+                              report: report,
+                            ),
+                            icon: const Icon(Icons.copy_rounded, size: 18),
+                            label: Text(KiamiStrings.uploadErrorBannerAction),
+                          ),
+                        ),
+                      ],
                       if (isUploading) ...[
                         const SizedBox(height: 6),
                         ClipRRect(
@@ -105,6 +122,12 @@ class UploadQueuePanel extends ConsumerWidget {
                                   .remove(item.id),
                             )
                           : null,
+                  onTap: isFailed && report != null
+                      ? () => showUploadErrorReportDialog(
+                            context,
+                            report: report,
+                          )
+                      : null,
                 );
               }),
             ],

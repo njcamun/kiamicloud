@@ -146,6 +146,7 @@ String kiamiApiErrorMessage(Object error) {
       'storage_over_quota' => KiamiStrings.subscriptionStorageOverQuota,
       'invalid_token' || 'unauthorized' =>
         'Sessão inválida. Inicie sessão novamente.',
+      'email_not_verified' => KiamiStrings.emailVerificationRequired,
       'internal_error' => error.message.isNotEmpty
           ? error.message
           : 'Erro interno do servidor. Tente novamente.',

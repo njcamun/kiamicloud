@@ -272,6 +272,12 @@ abstract final class KiamiStrings {
       'A subscrição expirou. Contacte o suporte nos próximos dias para renovar e manter todos os acessos.';
   static const String subscriptionRestricted =
       'Subscrição em atraso: novos uploads bloqueados. Contacte o suporte para renovar o plano.';
+  static const String emailVerificationRequired =
+      'Confirme o seu e-mail para usar ficheiros e uploads. Verifique a caixa de entrada (e spam).';
+  static const String emailVerificationResend = 'Reenviar e-mail';
+  static const String emailVerificationRefresh = 'Já confirmei';
+  static const String emailVerificationSent =
+      'E-mail de verificação enviado. Abra o link e toque em «Já confirmei».';
   static const String subscriptionSuspended =
       'Conta suspensa por falta de pagamento. Contacte o suporte para recuperar o acesso.';
   static const String subscriptionPendingDeletion =
@@ -304,6 +310,8 @@ abstract final class KiamiStrings {
       : '$count ficheiros enviados com sucesso.';
   static String uploadPartialSuccess(int ok, int failed) =>
       '$ok enviado(s), $failed não enviado(s).';
+  static String uploadPartialSuccessQuota(int ok, int quotaSkipped) =>
+      '$ok enviado(s). $quotaSkipped ignorado(s) — sem espaço na quota.';
   static String uploadPartialSuccessWithLimit(int ok, int failed, String maxPerFileLabel) =>
       '$ok enviado(s). $failed ignorado(s) — limite do plano: $maxPerFileLabel por ficheiro.';
   static String uploadSkippedTooLarge(int count, String maxPerFileLabel) =>
@@ -356,6 +364,21 @@ abstract final class KiamiStrings {
   static String uploadQueueTitle(int n) =>
       n == 1 ? '1 envio na fila' : '$n envios na fila';
   static const String uploadQueueRetry = 'Repetir';
+  static const String uploadQueueCopyError = 'Copiar erro';
+  static const String uploadErrorReportTitle = 'Relatório de erro do envio';
+  static const String uploadErrorReportCopy = 'Copiar relatório';
+  static const String uploadErrorReportCopied =
+      'Relatório copiado — cole na conversa ou num e-mail de suporte.';
+  static const String uploadErrorReportClose = 'Fechar';
+  static const String uploadSnackCopyError = 'Copiar erro';
+  static const String uploadDiagnosticBannerTitle = 'Diagnóstico do envio';
+  static const String uploadDiagnosticBannerHint =
+      'Toque em «Copiar relatório» e cole na conversa de suporte. '
+      'Logs técnicos: F12 → Consola (Chrome).';
+  static const String uploadDiagnosticDismiss = 'Fechar';
+  static const String uploadErrorBannerTitle = 'Envio falhou';
+  static const String uploadErrorBannerAction = 'Copiar relatório';
+  static const String uploadErrorTapHint = 'Toque para ver o relatório';
   static String uploadBackgroundStarted(int n) => n == 1
       ? '1 ficheiro na fila. O envio continua em segundo plano — avisamos quando terminar.'
       : '$n ficheiros na fila. Os envios continuam em segundo plano — avisamos quando terminar.';

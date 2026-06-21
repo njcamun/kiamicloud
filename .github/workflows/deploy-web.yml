@@ -36,7 +36,7 @@ jobs:
       - name: Build web release
         run: |
           cd apps/cloud/web
-          flutter build web --release --base-href / --no-wasm-dry-run
+          flutter build web --release --base-href / --no-wasm-dry-run --dart-define=KIAMI_ENV=production --dart-define=KIAMI_API_BASE_URL=https://kiamicloud-api.kiamicloud.workers.dev
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0

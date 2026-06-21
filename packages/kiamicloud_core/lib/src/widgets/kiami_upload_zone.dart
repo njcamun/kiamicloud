@@ -16,6 +16,7 @@ class KiamiUploadZone extends StatefulWidget {
     required this.onTap,
     this.enabled = true,
     this.isLoading = false,
+    this.blockTapWhileLoading = true,
     this.progressCurrent = 0,
     this.progressTotal = 0,
     this.uploadProgress = 0,
@@ -26,6 +27,8 @@ class KiamiUploadZone extends StatefulWidget {
   final VoidCallback? onTap;
   final bool enabled;
   final bool isLoading;
+  /// Quando falso, o utilizador pode adicionar mais ficheiros durante um upload.
+  final bool blockTapWhileLoading;
   final int progressCurrent;
   final int progressTotal;
   /// Progresso do ficheiro actual (0.0 – 1.0).
@@ -123,7 +126,10 @@ class _KiamiUploadZoneState extends State<KiamiUploadZone> {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: (!widget.enabled || widget.isLoading) ? null : widget.onTap,
+                onTap: (!widget.enabled ||
+                        (widget.isLoading && widget.blockTapWhileLoading))
+                    ? null
+                    : widget.onTap,
                 onHighlightChanged: widget.isLoading
                     ? null
                     : (v) => setState(() => _pressed = v),

@@ -69,10 +69,11 @@ Future<UploadPutResponse> putUploadBytes({
   required Map<String, String> headers,
   UploadProgressCallback? onProgress,
   Duration? timeout,
+  String httpMethod = 'PUT',
 }) async {
   final httpClient = client ?? http.Client();
   final uri = Uri.parse(url);
-  final request = http.StreamedRequest('PUT', uri);
+  final request = http.StreamedRequest(httpMethod.toUpperCase(), uri);
   request.headers.addAll(headers);
   request.headers['Content-Type'] = contentType;
 

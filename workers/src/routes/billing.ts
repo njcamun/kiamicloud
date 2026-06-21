@@ -13,7 +13,7 @@ import {
   listUserCheckouts,
   submitCheckoutProof,
 } from '../db/payments';
-import { getClientIp, hashIp } from '../lib/client-ip';
+import { getClientIp, getIpHashPepper, hashIp } from '../lib/client-ip';
 import { computeQuotaInfo } from '../lib/quota';
 import {
   applyLocalUnlimitedToProfile,
@@ -42,7 +42,7 @@ billingRoutes.post('/webhook', async (c) => {
   }
 
   const ip = getClientIp(c);
-  const ipHash = await hashIp(ip);
+  const ipHash = await hashIp(ip, getIpHashPepper(c.env));
   const rl = await checkRateLimit(
     db,
     `ip:${ip}:webhook`,
@@ -258,9 +258,9 @@ billingRoutes.put('/checkout/:id/proof', async (c) => {
 });
 
 billingRoutes.post('/checkout/:id/simulate-pay', async (c) => {
-  if (c.env.ENVIRONMENT === 'production') {
+  if (c.env.ENVIRONMENT !== 'development') {
     return c.json(
-      { error: 'forbidden', message: 'Simulacao apenas em desenvolvimento.' },
+      { error: 'forbidden', message: 'Simulacao apenas em desenvolvimento local.' },
       403,
     );
   }

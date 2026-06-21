@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
+import 'kiami_web_file_registry.dart';
 import 'path_file_bytes.dart';
 
 /// Motivo pelo qual um ficheiro seleccionado não pode ser enviado.
@@ -38,20 +39,45 @@ int platformFileEffectiveSize(PlatformFile file) {
   if (file.bytes != null && file.bytes!.isNotEmpty) {
     return file.bytes!.length;
   }
-  return file.size;
+  if (file.size > 0) return file.size;
+  return 0;
 }
 
 bool platformFileHasSource(PlatformFile file) {
   return (file.bytes != null && file.bytes!.isNotEmpty) ||
       file.readStream != null ||
-      (!kIsWeb && file.path != null && file.path!.isNotEmpty);
+      isWebFileRegistryRef(file.identifier) ||
+      (!kIsWeb && _platformFilePath(file) != null);
+}
+
+/// Caminho local — nunca aceder a [PlatformFile.path] na Web (lança excepção).
+String? _platformFilePath(PlatformFile file) {
+  if (kIsWeb) return null;
+  return file.path;
+}
+
+/// True quando convém tentar ler bytes antes de validar/enfileirar.
+bool platformFileShouldPreloadBytes(PlatformFile file) {
+  final noBytes = file.bytes == null || file.bytes!.isEmpty;
+  if (!noBytes) return false;
+
+  if (kIsWeb) {
+    return file.readStream != null || isWebFileRegistryRef(file.identifier);
+  }
+
+  final path = _platformFilePath(file);
+  return path == null || path.isEmpty;
 }
 
 /// Valida tamanho sem ler o ficheiro (multi-upload — evita OOM).
+///
+/// [checkStorageQuota]: quando false, a quota total é validada pelo servidor
+/// em `/files/upload/init` (permite enviar todos os ficheiros seleccionados).
 UploadFilePickOutcome validatePlatformFileForUpload({
   required PlatformFile file,
   required int maxFileBytes,
-  required int storageAvailableBytes,
+  int? storageAvailableBytes,
+  bool checkStorageQuota = true,
 }) {
   final name = file.name;
 
@@ -83,12 +109,14 @@ UploadFilePickOutcome validatePlatformFileForUpload({
       sizeBytes: effectiveSize,
     );
   }
-  if (effectiveSize > storageAvailableBytes) {
-    return UploadFileRejected(
-      name: name,
-      reason: UploadFileRejectReason.exceedsQuota,
-      sizeBytes: effectiveSize,
-    );
+  if (checkStorageQuota && storageAvailableBytes != null) {
+    if (effectiveSize > storageAvailableBytes) {
+      return UploadFileRejected(
+        name: name,
+        reason: UploadFileRejectReason.exceedsQuota,
+        sizeBytes: effectiveSize,
+      );
+    }
   }
 
   return UploadFileReady(name: name, bytes: const []);
@@ -98,7 +126,8 @@ UploadFilePickOutcome validatePlatformFileForUpload({
 Future<UploadFilePickOutcome> readPlatformFileForUpload({
   required PlatformFile file,
   required int maxFileBytes,
-  required int storageAvailableBytes,
+  int? storageAvailableBytes,
+  bool checkStorageQuota = true,
 }) async {
   final name = file.name;
   final reportedSize = platformFileEffectiveSize(file);
@@ -111,12 +140,14 @@ Future<UploadFilePickOutcome> readPlatformFileForUpload({
         sizeBytes: reportedSize,
       );
     }
-    if (reportedSize > storageAvailableBytes) {
-      return UploadFileRejected(
-        name: name,
-        reason: UploadFileRejectReason.exceedsQuota,
-        sizeBytes: reportedSize,
-      );
+    if (checkStorageQuota && storageAvailableBytes != null) {
+      if (reportedSize > storageAvailableBytes) {
+        return UploadFileRejected(
+          name: name,
+          reason: UploadFileRejectReason.exceedsQuota,
+          sizeBytes: reportedSize,
+        );
+      }
     }
   }
 
@@ -137,12 +168,14 @@ Future<UploadFilePickOutcome> readPlatformFileForUpload({
         sizeBytes: bytes.length,
       );
     }
-    if (bytes.length > storageAvailableBytes) {
-      return UploadFileRejected(
-        name: name,
-        reason: UploadFileRejectReason.exceedsQuota,
-        sizeBytes: bytes.length,
-      );
+    if (checkStorageQuota && storageAvailableBytes != null) {
+      if (bytes.length > storageAvailableBytes) {
+        return UploadFileRejected(
+          name: name,
+          reason: UploadFileRejectReason.exceedsQuota,
+          sizeBytes: bytes.length,
+        );
+      }
     }
 
     return UploadFileReady(name: name, bytes: bytes);
@@ -160,6 +193,10 @@ Future<List<int>?> _loadBytes(PlatformFile file, int maxBytes) async {
     return file.bytes;
   }
 
+  if (kIsWeb && isWebFileRegistryRef(file.identifier)) {
+    return readWebFileRegistryBytes(file.identifier!, maxBytes: maxBytes);
+  }
+
   if (kIsWeb && file.readStream != null) {
     final builder = BytesBuilder(copy: false);
     var total = 0;
@@ -171,8 +208,11 @@ Future<List<int>?> _loadBytes(PlatformFile file, int maxBytes) async {
     return builder.takeBytes();
   }
 
-  if (!kIsWeb && file.path != null && file.path!.isNotEmpty) {
-    return readPathFileBytes(file.path!, maxBytes);
+  if (!kIsWeb) {
+    final path = _platformFilePath(file);
+    if (path != null && path.isNotEmpty) {
+      return readPathFileBytes(path, maxBytes);
+    }
   }
 
   final stream = file.readStream;

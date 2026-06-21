@@ -22,6 +22,8 @@ import 'models/kiami_profile.dart';
 import 'models/file_thumbnail_url.dart';
 import 'models/thumbnail_upload_info.dart';
 import 'models/upload_init_result.dart';
+import '../features/upload/upload_debug.dart';
+import '../features/upload/upload_failure_report.dart';
 import '../utils/thumbnail_encoder.dart';
 
 class KiamiApiClient {
@@ -98,8 +100,13 @@ class KiamiApiClient {
     throw connectionError();
   }
 
-  Future<Map<String, String>> _authHeaders({bool jsonBody = false}) async {
-    final token = await FirebaseIdTokenService.getIdToken();
+  Future<Map<String, String>> _authHeaders({
+    bool jsonBody = false,
+    bool forceRefresh = false,
+  }) async {
+    final token = await FirebaseIdTokenService.getIdToken(
+      forceRefresh: forceRefresh,
+    );
     if (token == null) {
       throw KiamiApiException('Sessão expirada. Inicie sessão novamente.');
     }
@@ -260,7 +267,10 @@ class KiamiApiClient {
     required int sizeBytes,
     String? mimeType,
   }) async {
-    final headers = await _authHeaders(jsonBody: true);
+    final headers = await _authHeaders(
+      jsonBody: true,
+      forceRefresh: kIsWeb,
+    );
     _applyWebWorkerHeaders(headers, upload: true);
     final body = jsonEncode({
       'name': name,
@@ -283,54 +293,134 @@ class KiamiApiClient {
     UploadProgressCallback? onProgress,
   }) async {
     final resolvedMime = mimeType ?? 'application/octet-stream';
-    final init = await initUpload(
-      name: name,
-      sizeBytes: bytes.length,
-      mimeType: resolvedMime,
-    );
+    final initUrl = _uri('/files/upload/init').toString();
+
+    late final UploadInitResult init;
+    try {
+      UploadDebug.log('init POST $initUrl (${bytes.length} bytes, $name)');
+      init = await initUpload(
+        name: name,
+        sizeBytes: bytes.length,
+        mimeType: resolvedMime,
+      );
+      UploadDebug.log('init OK fileId=${init.fileId}');
+    } catch (e, st) {
+      UploadDebug.fail('init', e, stackTrace: st);
+      throw _uploadStageFailure(
+        stage: 'init',
+        fileName: name,
+        fileSizeBytes: bytes.length,
+        cause: e,
+        stackTrace: st,
+        requestUrl: initUrl,
+        httpMethod: 'POST',
+      );
+    }
 
     final viaWorker = kIsWeb || init.localDevUpload;
     final putUrl = viaWorker
         ? _uri('/files/upload/direct/${init.fileId}').toString()
         : init.uploadUrl;
+    final transferMethod = kIsWeb ? 'POST' : 'PUT';
 
-    final putResponse = await _putUploadBytes(
-      url: putUrl,
-      bytes: bytes,
-      contentType: resolvedMime,
-      useAuth: viaWorker,
-      onProgress: onProgress,
-    );
+    try {
+      final putResponse = await _putUploadBytes(
+        url: putUrl,
+        bytes: bytes,
+        contentType: resolvedMime,
+        useAuth: viaWorker,
+        onProgress: onProgress,
+      );
 
-    if (putResponse.statusCode < 200 || putResponse.statusCode >= 300) {
-      _throwUploadPutFailure(putResponse);
-    }
-
-    KiamiFile file;
-    if (viaWorker) {
-      file = _parseUploadPutFile(putResponse);
-    } else {
-      file = await completeUpload(init.fileId);
-    }
-
-    if (init.thumbnail != null &&
-        canGenerateThumbnail(name, resolvedMime) &&
-        bytes.length <= KiamiConstants.maxUploadBytes) {
-      final thumbBytes = await encodeThumbnailJpegAsync(bytes);
-      if (thumbBytes != null) {
+      if (putResponse.statusCode < 200 || putResponse.statusCode >= 300) {
         try {
-          file = await _uploadThumbnail(
+          _throwUploadPutFailure(putResponse);
+        } catch (e, st) {
+          throw _uploadStageFailure(
+            stage: 'transfer',
+            fileName: name,
+            fileSizeBytes: bytes.length,
+            cause: e,
+            stackTrace: st,
             fileId: init.fileId,
-            thumb: init.thumbnail!,
-            bytes: thumbBytes,
+            requestUrl: putUrl,
+            httpMethod: transferMethod,
+            statusCode: putResponse.statusCode,
+            errorCode: e is KiamiApiException ? e.errorCode : null,
+            responseBody: putResponse.body,
           );
-        } catch (_) {
-          // Miniatura opcional — o ficheiro principal ja foi guardado.
         }
       }
-    }
 
-    return file;
+      KiamiFile file;
+      if (viaWorker) {
+        file = _parseUploadPutFile(putResponse);
+      } else {
+        file = await completeUpload(init.fileId);
+      }
+
+      if (init.thumbnail != null &&
+          canGenerateThumbnail(name, resolvedMime) &&
+          bytes.length <= KiamiConstants.maxUploadBytes) {
+        final thumbBytes = await encodeThumbnailJpegAsync(bytes);
+        if (thumbBytes != null) {
+          try {
+            file = await _uploadThumbnail(
+              fileId: init.fileId,
+              thumb: init.thumbnail!,
+              bytes: thumbBytes,
+            );
+          } catch (_) {
+            // Miniatura opcional — o ficheiro principal ja foi guardado.
+          }
+        }
+      }
+
+      return file;
+    } catch (e, st) {
+      if (e is UploadFailureException) rethrow;
+      throw _uploadStageFailure(
+        stage: 'transfer',
+        fileName: name,
+        fileSizeBytes: bytes.length,
+        cause: e,
+        stackTrace: st,
+        fileId: init.fileId,
+        requestUrl: putUrl,
+        httpMethod: transferMethod,
+        statusCode: e is KiamiApiException ? e.statusCode : null,
+        errorCode: e is KiamiApiException ? e.errorCode : null,
+        responseBody: e is KiamiApiException ? e.message : null,
+      );
+    }
+  }
+
+  Never _uploadStageFailure({
+    required String stage,
+    required String fileName,
+    required int fileSizeBytes,
+    required Object cause,
+    StackTrace? stackTrace,
+    String? fileId,
+    String? requestUrl,
+    String? httpMethod,
+    int? statusCode,
+    String? errorCode,
+    String? responseBody,
+  }) {
+    throw UploadFailureException(
+      stage: stage,
+      fileName: fileName,
+      fileSizeBytes: fileSizeBytes,
+      cause: cause is UploadFailureException ? cause.cause : cause,
+      stackTrace: stackTrace,
+      fileId: fileId,
+      requestUrl: requestUrl,
+      httpMethod: httpMethod,
+      statusCode: statusCode ?? (cause is KiamiApiException ? cause.statusCode : null),
+      errorCode: errorCode ?? (cause is KiamiApiException ? cause.errorCode : null),
+      responseBody: responseBody,
+    );
   }
 
   Future<KiamiFile> uploadFilePath({
@@ -441,50 +531,68 @@ class KiamiApiClient {
   }) async {
     final headers = <String, String>{};
     if (useAuth) {
-      final token = await FirebaseIdTokenService.getIdToken();
+      final token = await FirebaseIdTokenService.getIdToken(forceRefresh: kIsWeb);
       if (token == null) {
         throw KiamiApiException('Sessão expirada. Inicie sessão novamente.');
       }
       headers['Authorization'] = 'Bearer $token';
     }
+    _applyWebWorkerHeaders(headers, upload: true);
 
-    try {
-      final result = await putUploadBytes(
-        client: _http,
-        url: url,
-        bytes: bytes,
-        contentType: contentType,
-        headers: headers,
-        onProgress: onProgress,
-        timeout: _transferTimeout(bytes.length),
-      );
+    final httpMethod = kIsWeb ? 'POST' : 'PUT';
 
-      if (result.statusCode == 0) {
-        throw connectionError();
+    for (var attempt = 0; attempt <= (kIsWeb ? _webRetryCount : 0); attempt++) {
+      try {
+        final result = await putUploadBytes(
+          client: _http,
+          url: url,
+          bytes: bytes,
+          contentType: contentType,
+          headers: headers,
+          onProgress: onProgress,
+          timeout: _transferTimeout(bytes.length),
+          httpMethod: httpMethod,
+        );
+
+        if (result.statusCode == 0) {
+          if (attempt >= (kIsWeb ? _webRetryCount : 0)) {
+            throw connectionError();
+          }
+          await Future<void>.delayed(_retryDelay * (attempt + 1));
+          continue;
+        }
+
+        return http.Response(
+          result.body,
+          result.statusCode,
+          headers: const {},
+        );
+      } on TimeoutException {
+        if (attempt >= (kIsWeb ? _webRetryCount : 0)) {
+          throw KiamiApiException(
+            KiamiStrings.apiUnavailableTimeout,
+            errorCode: 'connection_failed',
+          );
+        }
+      } on KiamiApiException {
+        rethrow;
+      } catch (e) {
+        final msg = e.toString();
+        if (msg.contains('SocketException') ||
+            msg.contains('Connection') ||
+            msg.contains('Failed to fetch') ||
+            msg.contains('NetworkError')) {
+          if (attempt >= (kIsWeb ? _webRetryCount : 0)) {
+            throw connectionError();
+          }
+        } else {
+          rethrow;
+        }
       }
-
-      return http.Response(
-        result.body,
-        result.statusCode,
-        headers: const {},
-      );
-    } on TimeoutException {
-      throw KiamiApiException(
-        KiamiStrings.apiUnavailableTimeout,
-        errorCode: 'connection_failed',
-      );
-    } on KiamiApiException {
-      rethrow;
-    } catch (e) {
-      final msg = e.toString();
-      if (msg.contains('SocketException') ||
-          msg.contains('Connection') ||
-          msg.contains('Failed to fetch') ||
-          msg.contains('NetworkError')) {
-        throw connectionError();
-      }
-      rethrow;
+      await Future<void>.delayed(_retryDelay * (attempt + 1));
     }
+
+    throw connectionError();
   }
 
   KiamiFile _parseUploadPutFile(http.Response response) {

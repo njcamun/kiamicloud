@@ -18,11 +18,15 @@ abstract final class KiamiConstants {
   static const int basicoPlanQuotaGb = 20;
   static const int basicoPlanMaxFileMb = 15;
 
-  /// API beta na Cloudflare (apos wrangler deploy --env beta).
+  /// API producao na Cloudflare.
+  static const String cloudProdApiBaseUrl =
+      'https://kiamicloud-api.kiamicloud.workers.dev';
+
+  /// API beta (apenas testes internos).
   static const String cloudBetaApiBaseUrl =
       'https://kiamicloud-api-beta.kiamicloud.workers.dev';
 
-  /// URL da API em runtime: beta por defeito; override com
+  /// URL da API em runtime: producao por defeito; override com
   /// `--dart-define=KIAMI_API_BASE_URL=http://localhost:8787`.
   static String get configuredApiBaseUrl {
     const fromEnv = String.fromEnvironment('KIAMI_API_BASE_URL');
@@ -30,7 +34,7 @@ abstract final class KiamiConstants {
     if (trimmed.isNotEmpty) {
       return trimmed.replaceAll(RegExp(r'/+$'), '');
     }
-    return cloudBetaApiBaseUrl;
+    return cloudProdApiBaseUrl;
   }
 
   /// IP estático do ZimaBlade (reserva DHCP no router).

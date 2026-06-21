@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -7,6 +8,7 @@ import '../api/kiami_api_config.dart';
 import '../config/kiami_environment.dart';
 import '../constants/kiami_constants.dart';
 import '../data/api_endpoint_store.dart';
+import '../features/auth/data/google_auth_service.dart';
 import '../firebase/kiami_firebase.dart';
 import 'kiami_google_sign_in.dart';
 
@@ -32,6 +34,13 @@ Future<void> kiamiBootstrap({
   debugPrint('kiamiBootstrap: KiamiFirebase.initialize...');
   await KiamiFirebase.initialize(options: firebaseOptions);
 
+  if (kIsWeb && KiamiFirebase.isConfigured) {
+    debugPrint('kiamiBootstrap: Google redirect result (web)...');
+    await GoogleAuthService.completeWebRedirectSignIn(
+      FirebaseAuth.instance,
+    );
+  }
+
   debugPrint('kiamiBootstrap: KiamiGoogleSignIn.registerDesktopIfNeeded...');
   await KiamiGoogleSignIn.registerDesktopIfNeeded(
     desktopClientId: googleDesktopClientId,
@@ -47,7 +56,7 @@ Future<void> kiamiBootstrap({
   } else {
     var resolvedApi = (apiBaseUrl != null && apiBaseUrl.trim().isNotEmpty)
         ? apiBaseUrl.trim()
-        : KiamiConstants.cloudBetaApiBaseUrl;
+        : KiamiConstants.cloudProdApiBaseUrl;
 
     resolvedApi = await ApiEndpointStore.loadEffectiveUrl(
       cloudDefault: resolvedApi,
@@ -60,7 +69,7 @@ Future<void> kiamiBootstrap({
 }
 
 String _resolveWebApiBaseUrl(String? apiBaseUrl) {
-  const fallback = KiamiConstants.cloudBetaApiBaseUrl;
+  const fallback = KiamiConstants.cloudProdApiBaseUrl;
   if (apiBaseUrl == null || apiBaseUrl.trim().isEmpty) {
     return fallback;
   }

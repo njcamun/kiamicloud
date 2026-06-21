@@ -14,5 +14,15 @@ R2_SECRET_ACCESS_KEY=
 # Fase 12 — webhook mock de pagamento (obrigatorio para POST /billing/webhook)
 PAYMENT_WEBHOOK_SECRET=dev-kiami-webhook-change-me
 
-# Fase 13 — painel admin (seu firebase_uid)
+# Tokens de media Flutter Web (obrigatorio em beta/producao)
+MEDIA_TOKEN_SECRET=dev-kiami-media-token-change-me
+
+# Pepper para hash de IP em logs (opcional; fallback usa PAYMENT_WEBHOOK_SECRET)
+SECURITY_IP_PEPPER=
+
+# Fase 13 — painel admin (firebase_uid, virgula se varios)
 ADMIN_UIDS=COLOQUE_SEU_FIREBASE_UID_AQUI
+
+# Consola Blade (apenas wrangler dev local / ZimaBlade)
+BLADE_CONSOLE_USER=admin
+BLADE_CONSOLE_PASSWORD=altere-esta-password-local

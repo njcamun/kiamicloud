@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../constants/kiami_constants.dart';
+import '../app/kiami_app_keys.dart';
 import '../features/auth/providers/auth_providers.dart';
 import '../theme/kiami_theme.dart';
+import '../widgets/upload_completion_listener.dart';
+import 'kiami_app_keys.dart';
 import 'kiami_theme_scope.dart';
 
 /// Widget raiz partilhado (requer [ProviderScope] no main).
@@ -31,13 +34,16 @@ class _KiamiAppState extends ConsumerState<KiamiApp> {
     return KiamiThemeScope(
       themeMode: _themeMode,
       onThemeModeChanged: (mode) => setState(() => _themeMode = mode),
-      child: MaterialApp.router(
-        title: KiamiConstants.appName,
-        debugShowCheckedModeBanner: false,
-        theme: KiamiTheme.light(),
-        darkTheme: KiamiTheme.dark(),
-        themeMode: _themeMode,
-        routerConfig: router,
+      child: UploadCompletionListener(
+        child: MaterialApp.router(
+          title: KiamiConstants.appName,
+          debugShowCheckedModeBanner: false,
+          theme: KiamiTheme.light(),
+          darkTheme: KiamiTheme.dark(),
+          themeMode: _themeMode,
+          scaffoldMessengerKey: kiamiScaffoldMessengerKey,
+          routerConfig: router,
+        ),
       ),
     );
   }

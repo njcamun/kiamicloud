@@ -27,6 +27,7 @@ import '../../splash/splash_page.dart';
 import '../../../app/kiami_theme_scope.dart';
 import '../../../routing/kiami_router_refresh.dart';
 import '../../legal/providers/legal_acceptance_providers.dart';
+import '../../../app/kiami_app_keys.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   if (KiamiFirebase.isConfigured) {
@@ -46,6 +47,7 @@ final kiamiRouterProvider = Provider<GoRouter>((ref) {
   final refresh = KiamiRouterRefresh(ref);
 
   return GoRouter(
+    navigatorKey: kiamiRootNavigatorKey,
     initialLocation: KiamiRoutes.splash,
     refreshListenable: refresh,
     redirect: (context, state) {
@@ -54,7 +56,7 @@ final kiamiRouterProvider = Provider<GoRouter>((ref) {
       final path = state.matchedLocation;
       final legalOk = ref.read(legalAcceptanceGateProvider);
 
-      if (auth.isLoading && path != KiamiRoutes.splash) {
+      if (auth.isLoading && path != KiamiRoutes.splash && path != KiamiRoutes.auth) {
         return KiamiRoutes.splash;
       }
 

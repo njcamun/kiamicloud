@@ -84,7 +84,9 @@ if (-not $SkipBuild) {
     try {
         dart run flutter_launcher_icons
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        flutter build web --release --base-href / --no-wasm-dry-run
+        flutter build web --release --base-href / --no-wasm-dry-run `
+          --dart-define=KIAMI_ENV=production `
+          --dart-define=KIAMI_API_BASE_URL=https://kiamicloud-api.kiamicloud.workers.dev
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
     finally {

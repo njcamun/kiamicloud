@@ -44,6 +44,12 @@ export type Env = {
   /** Segredo do webhook de pagamento (Fase 12) */
   PAYMENT_WEBHOOK_SECRET?: string;
 
+  /** Segredo dedicado para tokens de media (Flutter Web) — obrigatorio em beta/prod */
+  MEDIA_TOKEN_SECRET?: string;
+
+  /** Pepper opcional para hash de IP em logs de seguranca */
+  SECURITY_IP_PEPPER?: string;
+
   /** "false" desactiva POST /billing/checkout */
   PAYMENTS_ENABLED?: string;
 

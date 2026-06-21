@@ -6,7 +6,7 @@ enum KiamiAppEnvironment {
 }
 
 abstract final class KiamiEnvironment {
-  static const String appVersion = '0.6.0-beta';
+  static const String appVersion = '0.6.0';
 
   static KiamiAppEnvironment _current = KiamiAppEnvironment.development;
 

@@ -21,29 +21,55 @@ abstract final class GoogleAuthService {
     return _signInWithGoogleSignIn(auth: auth, googleSignIn: googleSignIn);
   }
 
+  /// Completa login Google após [signInWithRedirect] (apenas Web).
+  static Future<UserCredential?> completeWebRedirectSignIn(
+    FirebaseAuth auth,
+  ) async {
+    if (!kIsWeb) return null;
+    try {
+      final result = await auth.getRedirectResult();
+      if (result.user != null) {
+        debugPrint('[GoogleAuth] Redirect login OK: ${result.user!.uid}');
+      }
+      return result;
+    } catch (e, stack) {
+      debugPrint('[GoogleAuth] getRedirectResult: $e');
+      if (kDebugMode) {
+        debugPrint('$stack');
+      }
+      return null;
+    }
+  }
+
   static bool get _isDesktop {
     return defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.linux;
   }
 
-  /// Web: popup Firebase (nao usar google_sign_in no browser).
+  /// Web: popup (COOP same-origin-allow-popups no Hosting); redirect só se popup falhar.
   static Future<UserCredential> _signInWeb(FirebaseAuth auth) async {
+    final provider = GoogleAuthProvider()
+      ..setCustomParameters({'prompt': 'select_account'});
+
     try {
-      final provider = GoogleAuthProvider()
-        ..setCustomParameters({'prompt': 'select_account'});
       return await auth.signInWithPopup(provider);
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'auth/popup-blocked' ||
-          e.code == 'popup-blocked' ||
-          (e.message?.toLowerCase().contains('popup') ?? false)) {
-        throw FirebaseAuthException(
-          code: 'popup-blocked-by-browser',
-          message: 'O browser bloqueou a janela Google. Permita popups para localhost.',
-        );
-      }
-      rethrow;
+      if (!_shouldFallbackToRedirect(e)) rethrow;
+
+      debugPrint('[GoogleAuth] Popup indisponível (${e.code}); a usar redirect.');
+      await auth.signInWithRedirect(provider);
+      throw FirebaseAuthException(
+        code: 'redirect-initiated',
+        message: 'A redireccionar para o Google…',
+      );
     }
+  }
+
+  static bool _shouldFallbackToRedirect(FirebaseAuthException e) {
+    return e.code == 'auth/popup-blocked' ||
+        e.code == 'popup-blocked' ||
+        (e.message?.toLowerCase().contains('popup') ?? false);
   }
 
   /// Desktop (Windows/macOS/Linux): google_sign_in_dartio + browser OAuth.

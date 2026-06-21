@@ -14,7 +14,7 @@ Future<void> reloadApiEndpointFromStore() async {
   if (kIsWeb) {
     await ApiEndpointStore.clear();
     KiamiApiConfig.configure(
-      KiamiConstants.cloudBetaApiBaseUrl,
+      KiamiConstants.cloudProdApiBaseUrl,
       mode: KiamiApiEndpointMode.cloud,
     );
     return;
@@ -22,7 +22,7 @@ Future<void> reloadApiEndpointFromStore() async {
 
   final mode = await ApiEndpointStore.getMode();
   final url = await ApiEndpointStore.loadEffectiveUrl(
-    cloudDefault: KiamiConstants.cloudBetaApiBaseUrl,
+    cloudDefault: KiamiConstants.cloudProdApiBaseUrl,
   );
   KiamiApiConfig.configure(url, mode: mode);
 }
@@ -80,7 +80,7 @@ Future<void> persistAndApplyApiEndpoint(
     applyApiEndpointChange(
       ref,
       mode: KiamiApiEndpointMode.cloud,
-      cloudDefault: KiamiConstants.cloudBetaApiBaseUrl,
+      cloudDefault: KiamiConstants.cloudProdApiBaseUrl,
     );
     return;
   }
@@ -90,7 +90,7 @@ Future<void> persistAndApplyApiEndpoint(
     ref,
     mode: mode,
     localHost: localHost,
-    cloudDefault: KiamiConstants.cloudBetaApiBaseUrl,
+    cloudDefault: KiamiConstants.cloudProdApiBaseUrl,
   );
 }
 

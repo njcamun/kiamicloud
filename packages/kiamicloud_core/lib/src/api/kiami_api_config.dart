@@ -40,7 +40,7 @@ abstract final class KiamiApiConfig {
     if (KiamiEnvironment.isProduction) {
       return const String.fromEnvironment(
         'KIAMI_PROD_API_URL',
-        defaultValue: 'https://kiamicloud-api.workers.dev',
+        defaultValue: 'https://kiamicloud-api.kiamicloud.workers.dev',
       );
     }
     return KiamiEnvironment.defaultBetaApiUrl;

@@ -16,10 +16,11 @@ abstract final class AuthExceptionMessages {
       'network-request-failed' => 'Sem ligação à internet. Verifique a rede.',
       'popup-closed-by-user' => 'Início de sessão Google cancelado.',
       'popup-blocked-by-browser' =>
-        'Permita popups para este site (localhost) e tente Google novamente.',
+        'Permita popups para este site ou tente novamente.',
+      'redirect-initiated' => 'A redireccionar para o Google…',
       'auth/popup-closed-by-user' => 'Início de sessão Google cancelado.',
       'auth/popup-blocked' =>
-        'Popup bloqueado. Permita janelas emergentes para localhost.',
+        'Popup bloqueado. Permita janelas emergentes para este site.',
       'account-exists-with-different-credential' =>
         'Já existe conta com este e-mail noutro método.',
       'firebase-not-configured' =>

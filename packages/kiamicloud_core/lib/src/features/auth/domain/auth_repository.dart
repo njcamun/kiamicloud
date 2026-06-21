@@ -18,6 +18,12 @@ abstract class AuthRepository {
 
   Future<void> sendPasswordResetEmail({required String email});
 
+  /// Reenvia e-mail de verificação Firebase (contas e-mail/palavra-passe).
+  Future<void> sendEmailVerification();
+
+  /// Actualiza claims locais (ex.: após o utilizador clicar no link de verificação).
+  Future<void> reloadCurrentUser();
+
   Future<KiamiUser> signInWithGoogle();
 
   Future<void> signOut();

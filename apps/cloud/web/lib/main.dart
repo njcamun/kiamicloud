@@ -5,15 +5,15 @@ import 'package:kiamicloud_core/kiamicloud_core.dart';
 import 'firebase_options.dart';
 import 'google_oauth_client.dart';
 
-/// Web — API Cloudflare beta.
+/// Web — API Cloudflare producao.
 Future<void> main() async {
   debugPrint('KiamiCloud: A iniciar bootstrap...');
   try {
     await kiamiBootstrap(
       firebaseOptions: DefaultFirebaseOptions.currentPlatform,
       googleWebClientId: GoogleOAuthClient.webClientId,
-      environment: KiamiAppEnvironment.beta,
-      apiBaseUrl: KiamiConstants.cloudBetaApiBaseUrl,
+      environment: KiamiAppEnvironment.production,
+      apiBaseUrl: KiamiConstants.cloudProdApiBaseUrl,
     );
     debugPrint('KiamiCloud: Bootstrap concluido.');
   } catch (e, stack) {

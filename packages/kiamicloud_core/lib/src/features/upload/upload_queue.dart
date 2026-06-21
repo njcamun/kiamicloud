@@ -7,8 +7,12 @@ import '../../api/kiami_api_client.dart';
 import '../../api/kiami_api_exception.dart';
 import '../../utils/kiami_api_limits.dart';
 import '../../utils/guess_mime.dart';
+import '../../utils/kiami_web_file_registry.dart';
 import '../../utils/path_file_bytes.dart';
 import '../files/providers/files_providers.dart';
+import 'upload_failure_report.dart';
+import 'upload_debug.dart';
+import 'upload_diagnostic.dart';
 
 enum UploadQueueItemStatus {
   pending,
@@ -26,6 +30,7 @@ class UploadQueueItem {
     this.bytes,
     required this.status,
     this.errorMessage,
+    this.errorReport,
     this.attempts = 0,
     this.progress = 0,
   });
@@ -39,6 +44,8 @@ class UploadQueueItem {
   final List<int>? bytes;
   final UploadQueueItemStatus status;
   final String? errorMessage;
+  /// Relatório técnico copiável (fase, URL, status HTTP, etc.).
+  final String? errorReport;
   final int attempts;
   /// Progresso do envio (0.0 – 1.0).
   final double progress;
@@ -46,10 +53,12 @@ class UploadQueueItem {
   UploadQueueItem copyWith({
     UploadQueueItemStatus? status,
     String? errorMessage,
+    String? errorReport,
     int? attempts,
     List<int>? bytes,
     double? progress,
     bool clearBytes = false,
+    bool clearErrorReport = false,
   }) {
     return UploadQueueItem(
       id: id,
@@ -59,6 +68,7 @@ class UploadQueueItem {
       bytes: clearBytes ? null : bytes ?? this.bytes,
       status: status ?? this.status,
       errorMessage: errorMessage,
+      errorReport: clearErrorReport ? null : errorReport ?? this.errorReport,
       attempts: attempts ?? this.attempts,
       progress: progress ?? this.progress,
     );
@@ -186,6 +196,7 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
 
   void enqueueAll(List<UploadQueueRequest> files) {
     if (files.isEmpty) return;
+    UploadDebug.log('enqueueAll: ${files.length} ficheiro(s)');
     final base = DateTime.now().microsecondsSinceEpoch;
     final newItems = <UploadQueueItem>[];
     for (var i = 0; i < files.length; i++) {
@@ -207,6 +218,12 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
   }
 
   void remove(String id) {
+    for (final item in state.items) {
+      if (item.id == id) {
+        _releaseWebFileRef(item);
+        break;
+      }
+    }
     state = state.copyWith(
       items: state.items.where((i) => i.id != id).toList(),
     );
@@ -219,6 +236,7 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
       return i.copyWith(
         status: UploadQueueItemStatus.pending,
         errorMessage: null,
+        clearErrorReport: true,
         clearBytes: !kIsWeb,
       );
     }).toList();
@@ -230,6 +248,14 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
   Future<List<int>> _loadBytes(UploadQueueItem item) async {
     if (item.bytes != null && item.bytes!.isNotEmpty) {
       return item.bytes!;
+    }
+    if (kIsWeb && isWebFileRegistryRef(item.path)) {
+      final maxBytes = _maxFileBytes();
+      final bytes = await readWebFileRegistryBytes(item.path!, maxBytes: maxBytes);
+      if (bytes == null || bytes.isEmpty) {
+        throw KiamiApiException('Não foi possível ler ${item.name}.');
+      }
+      return bytes;
     }
     if (item.path != null && item.path!.isNotEmpty && !kIsWeb) {
       final maxBytes = _maxFileBytes();
@@ -302,8 +328,22 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
         _resetProgressThrottle();
         _updateById(itemId, item);
 
+        List<int> bytes;
         try {
-          final bytes = await _loadBytes(item);
+          bytes = await _loadBytes(item);
+        } catch (e, st) {
+          _markUploadFailed(
+            itemId: itemId,
+            item: item,
+            error: e,
+            stackTrace: st,
+            stage: 'read_bytes',
+            onFailed: () => sessionFailed += 1,
+          );
+          continue;
+        }
+
+        try {
           await _ref.read(kiamiApiClientProvider).uploadFile(
                 name: item.name,
                 bytes: bytes,
@@ -321,6 +361,9 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
                 },
               );
           sessionSucceeded += 1;
+          if (kIsWeb && isWebFileRegistryRef(item.path)) {
+            consumeWebFileRegistryRef(item.path!);
+          }
           _updateById(
             itemId,
             item.copyWith(
@@ -332,20 +375,14 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
           state = state.copyWith(
             items: state.items.where((i) => i.id != itemId).toList(),
           );
-        } catch (e) {
-          sessionFailed += 1;
-          final msg = e is KiamiApiException
-              ? e.message
-              : KiamiApiClient.connectionError().message;
-          final failedAttempts = item.attempts + 1;
-          _updateById(
-            itemId,
-            item.copyWith(
-              status: UploadQueueItemStatus.failed,
-              errorMessage: msg,
-              attempts: failedAttempts,
-              clearBytes: !kIsWeb,
-            ),
+        } catch (e, st) {
+          final failedAttempts = _markUploadFailed(
+            itemId: itemId,
+            item: item,
+            error: e,
+            stackTrace: st,
+            stage: e is UploadFailureException ? e.stage : 'upload',
+            onFailed: () => sessionFailed += 1,
           );
           if (e is KiamiApiException &&
               (e.errorCode == 'quota_exceeded' ||
@@ -381,6 +418,49 @@ class UploadQueueNotifier extends StateNotifier<UploadQueueState> {
         }
       }
     } while (_drainAgain || _hasPendingWork());
+  }
+
+  int _markUploadFailed({
+    required String itemId,
+    required UploadQueueItem item,
+    required Object error,
+    required StackTrace stackTrace,
+    required String stage,
+    required void Function() onFailed,
+  }) {
+    onFailed();
+    final msg = error is UploadFailureException
+        ? error.userMessage
+        : error is KiamiApiException
+            ? error.message
+            : KiamiApiClient.connectionError().message;
+    final report = buildUploadFailureReport(
+      fileName: item.name,
+      fileSizeBytes: item.sizeBytes,
+      error: error,
+      stackTrace: stackTrace,
+      stage: stage,
+    );
+    final failedAttempts = item.attempts + 1;
+    UploadDebug.fail(stage, error, stackTrace: stackTrace);
+    publishUploadDiagnostic(_ref, report);
+    _updateById(
+      itemId,
+      item.copyWith(
+        status: UploadQueueItemStatus.failed,
+        errorMessage: msg,
+        errorReport: report,
+        attempts: failedAttempts,
+        clearBytes: !kIsWeb,
+      ),
+    );
+    return failedAttempts;
+  }
+
+  void _releaseWebFileRef(UploadQueueItem item) {
+    if (kIsWeb && isWebFileRegistryRef(item.path)) {
+      discardWebFileRegistryRef(item.path!);
+    }
   }
 
   UploadQueueItem? _findById(String id) {

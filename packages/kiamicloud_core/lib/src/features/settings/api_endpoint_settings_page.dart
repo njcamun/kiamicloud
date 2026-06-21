@@ -69,7 +69,7 @@ class _ApiEndpointSettingsPageState
     _testVisual = _ServerTestVisual.none;
   }
 
-  String get _cloudUrl => KiamiConstants.cloudBetaApiBaseUrl;
+  String get _cloudUrl => KiamiConstants.cloudProdApiBaseUrl;
 
   String _resolveDraftUrl() {
     return ApiEndpointStore.resolveUrl(

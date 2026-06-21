@@ -20,7 +20,7 @@ import {
   listRecentlyActiveUsersAdmin,
   listSecurityEventsAdmin,
 } from '../db/admin';
-import { getClientIp, hashIp } from '../lib/client-ip';
+import { getClientIp, getIpHashPepper, hashIp } from '../lib/client-ip';
 import { checkRateLimit } from '../db/rate-limit';
 import { logSecurityEvent } from '../db/security';
 
@@ -46,7 +46,7 @@ bladeConsoleRoutes.post('/login', async (c) => {
 
   const creds = bladeConsoleCredentials(c.env)!;
   const ip = getClientIp(c);
-  const ipHash = await hashIp(ip);
+  const ipHash = await hashIp(ip, getIpHashPepper(c.env));
   const bucket = `ip:${ip}:blade_console_login`;
   const rl = await checkRateLimit(c.env.DB, bucket, 10, 60);
   if (!rl.allowed) {

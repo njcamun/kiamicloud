@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +15,7 @@ import '../../../widgets/kiami_button.dart';
 import '../../../widgets/kiami_card.dart';
 import '../../../widgets/kiami_logo_bar.dart';
 import '../data/auth_exception_messages.dart';
+import '../domain/kiami_user.dart';
 import '../providers/auth_providers.dart';
 import 'forgot_password_dialog.dart';
 
@@ -88,18 +90,31 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       _errorMessage = null;
     });
 
+    var keepLoading = false;
     try {
       await ref.read(authRepositoryProvider).signInWithGoogle();
       if (mounted) context.go(KiamiRoutes.home);
     } catch (e) {
+      if (e is FirebaseAuthException && e.code == 'redirect-initiated') {
+        keepLoading = true;
+        return;
+      }
       setState(() => _errorMessage = AuthExceptionMessages.fromObject(e));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && !keepLoading) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<KiamiUser?>>(authStateProvider, (previous, next) {
+      if (next.valueOrNull != null && mounted) {
+        context.go(KiamiRoutes.home);
+      }
+    });
+
     final width = MediaQuery.sizeOf(context).width;
     final isWide = width >= 900;
     final brightness = Theme.of(context).brightness;
